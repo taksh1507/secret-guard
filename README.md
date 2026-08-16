@@ -150,6 +150,7 @@ and a self-scan job) and runs GitGuardian on every pull request.
 
 Contributions of any size are welcome — new detection rules, false-positive
 reports, docs, editor integrations. Start with [CONTRIBUTING](CONTRIBUTING.md).
+See our [Contributors](CONTRIBUTORS.md) list for everyone who has helped.
 Please read our [Code of Conduct](CODE_OF_CONDUCT.md) and report security
 issues per our [Security Policy](SECURITY.md).
 

@@ -6,6 +6,64 @@ small.
 Please read and follow this guide so your contribution lands quickly and
 passes the automated checks.
 
+## Your first PR
+
+Welcome! Here's a quick walkthrough to get your first contribution merged in
+under 15 minutes.
+
+### 1. Set up your dev environment
+
+```bash
+git clone https://github.com/taksh1507/secret-guard.git
+cd secret-guard
+python -m venv .venv
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
+pip install -e .
+```
+
+### 2. Run the tests
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+All tests should pass. If not, check your Python version (3.9+).
+
+### 3. Pick an issue
+
+Browse [good first issues](https://github.com/taksh1507/secret-guard/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)
+and pick one that interests you.
+
+### 4. Make your change
+
+- **Adding a rule?** Edit `secretguard/rules.py`, add a test in
+  `tests/test_rules.py`, and run the suite.
+- **Fixing a bug?** Write a failing test first, then fix the code.
+- **Docs?** Edit the relevant `.md` file under `docs/` or the root.
+
+### 5. Run checks before pushing
+
+```bash
+python -m unittest discover -s tests -v
+ruff check secretguard tests
+python -m secretguard scan . --exclude tests --no-entropy
+```
+
+All three must pass.
+
+### 6. Open your PR
+
+```bash
+git checkout -b fix/my-change
+git add .
+git commit -m "fix: brief description of change"
+git push origin fix/my-change
+```
+
+Fill out the PR template. CI will run automatically. Fix any failures.
+
+---
+
 ## Code of conduct
 
 Everyone is expected to follow our [Code of Conduct](CODE_OF_CONDUCT.md).
