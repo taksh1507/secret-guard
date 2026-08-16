@@ -260,6 +260,76 @@ class DotenvKeyTest(unittest.TestCase):
                 is_dotenv_path(path), f"{path!r} should not be treated as a dotenv file"
             )
 
+class DotenvValueParsingTest(unittest.TestCase):
+    def test_export_prefix_is_detected(self):
+        text = "export GITHUB_TOKEN=ghp_abc123\n"
+        items = list(dotenv_secret_assignments(text))
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0][1], "GITHUB_TOKEN")
+        self.assertEqual(items[0][2], "ghp_abc123")
+
+    def test_double_quoted_value_with_equals_and_spaces(self):
+        text = 'API_KEY="quoted with = and spaces"\n'
+        items = list(dotenv_secret_assignments(text))
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0][2], "quoted with = and spaces")
+
+    def test_single_quoted_value(self):
+        text = "API_KEY='single quoted test value'\n"
+        items = list(dotenv_secret_assignments(text))
+        self.assertEqual(items[0][2], "single quoted test value")
+
+    def test_escaped_quote_inside_quoted_value(self):
+        text = r'API_KEY="value with \"escaped\" quote"' + "\n"
+        items = list(dotenv_secret_assignments(text))
+        self.assertEqual(items[0][2], 'value with "escaped" quote')
+
+    def test_trailing_comment_on_unquoted_value_is_stripped(self):
+        text = "API_KEY=abc123 # note about this key\n"
+        items = list(dotenv_secret_assignments(text))
+        self.assertEqual(items[0][2], "abc123")
+
+    def test_trailing_comment_on_quoted_value_is_stripped(self):
+        text = 'API_KEY="abc123" # note\n'
+        items = list(dotenv_secret_assignments(text))
+        self.assertEqual(items[0][2], "abc123")
+
+    def test_hash_inside_unquoted_value_without_preceding_space_is_kept(self):
+        # Classic false-positive trap: a value containing '#' with no
+        # space before it is part of the value, not a comment.
+        text = "DB_TOKEN=tok#uvw123\n"
+        items = list(dotenv_secret_assignments(text))
+        self.assertEqual(items[0][2], "tok#uvw123")
+
+    def test_equals_inside_unquoted_value_is_kept(self):
+        text = "DB_TOKEN=abc=def\n"
+        items = list(dotenv_secret_assignments(text))
+        self.assertEqual(items[0][2], "abc=def")
+        
+    def test_interpolated_variable_is_detected_and_not_resolved(self):
+        text = "API_KEY=${OTHER_SECRET}\n"
+        items = list(dotenv_secret_assignments(text))
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0][2], "${OTHER_SECRET}")
+
+    def test_dollar_variable_without_braces_is_detected(self):
+        text = "API_KEY=$OTHER_SECRET\n"
+        items = list(dotenv_secret_assignments(text))
+        self.assertEqual(items[0][2], "$OTHER_SECRET")
+
+    def test_empty_quoted_value_is_not_flagged(self):
+        text = 'API_KEY=""\n'
+        items = list(dotenv_secret_assignments(text))
+        self.assertEqual(items, [])
+
+    def test_non_dotenv_file_behavior_is_unaffected(self):
+        # Sanity check: is_dotenv_path still gates which files get parsed
+        # this way; parsing logic itself doesn't care about the filename.
+        self.assertFalse(is_dotenv_path("config.py"))
+
+
+
+
 
 if __name__ == "__main__":
     unittest.main()

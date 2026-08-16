@@ -182,9 +182,23 @@ def matches_rules(text):
 
 # Dotenv (.env) support: flag files that assign values to secret-looking keys,
 # reporting the key name without ever exposing the assigned value.
+#
+# Supports the common dotenv subset: an optional `export` prefix, single-
+# or double-quoted values (with backslash escapes for the quote character),
+# and a trailing `# comment` on unquoted values. Variable interpolation
+# (`$VAR` / `${VAR}`) is kept as opaque text and never resolved — resolving
+# it would mean reading other variables' real values, which this scanner
+# intentionally never does.
+#
+# Multiline quoted values are not supported: a value always ends at the
+# line's newline, matching this parser's documented scope (not full
+# python-dotenv semantics).
 DOTENV_LINE = re.compile(
-    r"^(?P<key>[A-Za-z_][A-Za-z0-9_.]*)\s*=\s*(?P<value>.*)$"
+    r"^(?:export\s+)?(?P<key>[A-Za-z_][A-Za-z0-9_.]*)\s*=\s*(?P<rest>.*)$",
+    re.IGNORECASE,
 )
+DOTENV_COMMENT_RE = re.compile(r"(?:^|\s)#")
+
 SECRET_KEY_PATTERN = re.compile(
     r"(?i)(password|passwd|pwd|secret|token|api[_-]?key|access[_-]?key|"
     r"private[_-]?key|credential|client[_-]?secret|consumer[_-]?secret|"
@@ -205,6 +219,44 @@ def is_dotenv_path(rel_path):
     return bool(re.search(r"\.env(\.|$)", base, re.IGNORECASE))
 
 
+def _parse_dotenv_value(rest):
+    """Parse the right-hand side of a KEY=... line into a value string.
+
+    Strips an optional surrounding quote (handling escaped quote/backslash
+    characters) and any trailing inline `# comment` on unquoted values.
+    Returns "" for a genuinely empty value.
+    """
+    rest = rest.strip()
+    if not rest:
+        return ""
+
+    quote = rest[0]
+    if quote in ("'", '"'):
+        chars = []
+        i = 1
+        while i < len(rest):
+            c = rest[i]
+            if c == "\\" and i + 1 < len(rest) and rest[i + 1] in (quote, "\\"):
+                chars.append(rest[i + 1])
+                i += 2
+                continue
+            if c == quote:
+                # Closing quote: anything after this is comment/whitespace,
+                # never part of the value.
+                return "".join(chars)
+            chars.append(c)
+            i += 1
+        # No closing quote — malformed line; best-effort value.
+        return "".join(chars)
+
+    # Unquoted: an inline comment starts at a '#' preceded by whitespace or
+    # at position 0, so a literal '#' inside a value like `p#ss=1` is kept.
+    match = DOTENV_COMMENT_RE.search(rest)
+    if match:
+        rest = rest[: match.start()]
+    return rest.strip()
+
+
 def dotenv_secret_assignments(text):
     """Yield (line, key, value) for .env lines whose key names a secret."""
 
@@ -215,6 +267,6 @@ def dotenv_secret_assignments(text):
         if not match:
             continue
         key = match.group("key")
-        value = match.group("value").strip()
+        value = _parse_dotenv_value(match.group("rest"))
         if value and SECRET_KEY_PATTERN.search(key):
             yield line_no, key, value
