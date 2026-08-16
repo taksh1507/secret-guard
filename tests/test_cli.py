@@ -19,11 +19,15 @@ def run_git(repo, *args):
 
 class CliTest(unittest.TestCase):
     def run_cli(self, cwd, *args):
+        import os
+        env = os.environ.copy()
+        env["PYTHONPATH"] = str(PROJECT_ROOT)
         return subprocess.run(
             [sys.executable, "-m", "secretguard", *args],
             capture_output=True,
             text=True,
             cwd=cwd,
+            env=env,
             check=False,
         )
 

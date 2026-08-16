@@ -65,6 +65,42 @@ RULES = [
         description="Stripe live secret API key.",
     ),
     _r(
+        r"npm_[a-z0-9]{36}",
+        "npm Token",
+        severity="high",
+        description="npm registry access token.",
+    ),
+    _r(
+        r"SG\.[a-z0-9_-]{22}\.[a-z0-9_-]{43}",
+        "SendGrid API Key",
+        severity="high",
+        description="SendGrid API key.",
+    ),
+    _r(
+        r"SK[a-f0-9]{32}",
+        "Twilio API Key",
+        severity="high",
+        description="Twilio API key SID.",
+    ),
+    _r(
+        r"(?i)heroku[a-z0-9_.\-\t ]{0,30}(?:=|>|:=|\|\|:|<=|=>|:|\s)\s*['\"]?([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})['\"]?",
+        "Heroku API Key",
+        severity="high",
+        description="Heroku API key or authorization token.",
+    ),
+    _r(
+        r"do[oprt]_v1_[a-f0-9]{64}",
+        "DigitalOcean Token",
+        severity="high",
+        description="DigitalOcean personal access or OAuth token.",
+    ),
+    _r(
+        r"pat-[a-z0-9-]{32,}",
+        "HubSpot Access Token",
+        severity="high",
+        description="HubSpot Private App Access Token.",
+    ),
+    _r(
         r"sk-[0-9a-fA-F]{32,}",
         "Generic Secret Key",
         severity="medium",
