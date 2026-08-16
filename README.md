@@ -1,37 +1,50 @@
 <div align="center">
 
-# 🛡️ secret-guard
+# secret-guard
 
-**Scan your codebase for leaked secrets before they ever reach your git history.**
+**A zero-dependency secret scanner for Python, CI, and pre-commit hooks.**
 
-Zero-dependency · Fast · CI-ready · Git-hook ready
+Detect AWS keys, GitHub tokens, private keys, and hundreds of other secrets
+before they reach your git history.
 
 [![CI](https://github.com/taksh1507/secret-guard/actions/workflows/ci.yml/badge.svg)](https://github.com/taksh1507/secret-guard/actions/workflows/ci.yml)
 [![secret-guard scan](https://github.com/taksh1507/secret-guard/actions/workflows/scan.yml/badge.svg)](https://github.com/taksh1507/secret-guard/actions/workflows/scan.yml)
 [![PyPI - Version](https://img.shields.io/pypi/v/secret-guard-scan)](https://pypi.org/project/secret-guard-scan/)
-[![PyPI - Python](https://img.shields.io/pypi/pyversions/secret-guard-scan)](https://pypi.org/project/secret-guard-scan/)
+[![PyPI - Python Versions](https://img.shields.io/pypi/pyversions/secret-guard-scan)](https://pypi.org/project/secret-guard-scan/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 </div>
 
 ---
 
-## Why secret-guard?
+## What it does
 
-Hardcoding secrets is the single most common — and most dangerous — mistake
-developers make. A leaked `AWS key`, `GitHub token`, or `private key` can cost
-you money, trust, and hours of damage control. **secret-guard** catches them in
-seconds, right on your own machine or in CI, before the secret goes public.
+secret-guard scans source files for hardcoded credentials using **13 pattern
+rules** plus **Shannon-entropy detection**, and reports each finding with a
+severity and a **masked** value. By default it never prints the secret itself.
 
-- 🔒 **20+ detection rules**: AWS keys, GitHub tokens, Stripe, Slack, Google
-  API keys, JWTs, private keys, credential assignments, and more.
-- 🧠 **Entropy detection**: flags high-entropy strings even when no pattern
-  matches.
-- 📁 **gitignore-aware**: automatically skips `node_modules`, `.git`, `venv`,
-  and whatever your `.gitignore` already covers.
-- 🚀 **Zero dependencies** for core scanning. Just `pip install` and go.
-- ⚡ **Fast**: written in pure Python, no external services.
-- 🪝 **Git-hook guard**: one command protects every future commit.
+| Category | Rules |
+| --- | --- |
+| Cloud / SaaS | AWS Access Key IDs, AWS temporary & dashed keys, Google API Keys, Stripe live keys |
+| Tokens | GitHub PAT (classic & fine-grained), Slack tokens, Square access tokens, JWTs |
+| Key material | RSA / EC / DSA / OpenSSH / PGP private keys (`CRITICAL`) |
+| Heuristics | Generic secret keys, credential assignments, high-entropy strings |
+
+On top of pattern matching, `secret-guard` catches **`.env` files** with
+secret-looking variable names (`.env`, `.env.local`, `prod.env`, …). It reports
+the *key name* and severity but never the value.
+
+## Features
+
+- **Zero runtime dependencies** — pure Python, no network calls.
+- **Masked by default** — secret values are redacted in console and JSON output;
+  `--show-value` is an explicit opt-in for recovery/rotation work.
+- **Git-aware `--staged`**: scans the git *index blob*, not the working tree, so
+  it catches secrets that are staged but already deleted from disk.
+- **gitignore-aware**: skips `.git`, `node_modules`, `venv`, and whatever your
+  `.gitignore` already covers; repeatable `--exclude` for anything else.
+- **Entropy detection**: flags high-entropy strings even when no rule matches.
+- **Fast, single-file install**: works in CI in one line.
 
 ## Install
 
@@ -39,7 +52,8 @@ seconds, right on your own machine or in CI, before the secret goes public.
 pip install secret-guard-scan
 ```
 
-Or run without installing (Python ≥ 3.8):
+The CLI is `secret-guard`. You can also run the repo without installing
+(Python ≥ 3.8):
 
 ```bash
 python -m secretguard
@@ -51,14 +65,16 @@ python -m secretguard
 # Scan the current directory
 secret-guard scan
 
-# Scan a specific path, show exactly what was found
+# Scan a specific path
 secret-guard scan ./src
 
-# Machine-readable output for CI / other tools
+# JSON output for CI / tooling
 secret-guard scan --json
 
-# Protect every future commit
-cd your-repo
+# Only files staged for commit (reads the git index)
+secret-guard scan --staged
+
+# Guard every future commit with a git pre-commit hook
 secret-guard install-hook
 ```
 
@@ -72,67 +88,84 @@ app.py:40 [MEDIUM  ] Credential Assignment: password = 'hunter 2'
 1 critical, 1 high, 1 medium, 0 low — 3 total
 ```
 
-Secret values are **masked by default** in both the console report and the
-`--json` output. Use `--show-value` only when you need the full value (e.g. to
-rotate the key you just found).
+Values are masked by default. Use `--show-value` only when you actually need the
+full string — for example, to rotate the key you just found.
 
 ## Usage
 
 ```
-$ secret-guard scan [path] [options]
+secret-guard scan [path] [options]
 
-Options:
+positional arguments:
+  path              Path to scan (default: .)
+
+options:
   --exclude DIR     Skip additional directory names (repeatable)
   --no-entropy      Disable high-entropy string detection
   --json            Output findings as JSON
-  --show-value      Print full secret values (default: masked)
-  --staged          Scan only files staged for commit
+  --show-value      Print full secret values (default masks them)
+  --staged          Scan only files staged in git
 ```
 
 ### Exit codes
 
-- `0` — no secrets found (or help/version)
-- `1` — at least one secret detected
+- `0` — no secrets found, or `--help`/`--version`
+- `1` — at least one secret detected (or an error occurred)
 
-Use this in CI:
+Use this in CI — the job fails the moment a secret shows up:
 
 ```yaml
-- run: pip install secret-guard-scan
-- run: secret-guard scan .
+- name: Scan for secrets
+  run: |
+    pip install secret-guard-scan
+    secret-guard scan . \
+      --json \
+      --exclude tests \
+      --exclude .venv
 ```
 
-## Why this project matters
+## Staged scanning
 
-Every week, thousands of secrets leak into public repos. Tools like this one
-turn "oops, I pushed my key" from a weekly occurrence into a rare event. By
-using and contributing to **secret-guard**, you actively make the ecosystem
-safer.
+```bash
+secret-guard scan --staged
+```
 
-## Star the repo ⭐
+reads each staged file directly from the git index (`git show :<path>`). This
+matters when a secret was added, staged, and then deleted from the working tree:
+a worktree-only scan would miss it, but the staged version caught by
+secret-guard is exactly what would otherwise be committed.
 
-If secret-guard helps you, starring the repo is the fastest way to help other
-developers find it. It's free, takes one click, and keeps the project alive.
+## Local development
+
+```bash
+python -m unittest discover -s tests
+python -m ruff check secretguard tests
+python -m secretguard scan . --exclude tests --no-entropy
+```
+
+The repository enforces these in CI (tests on Python 3.9 / 3.11 / 3.13, lint,
+and a self-scan job) and runs GitGuardian on every pull request.
 
 ## Contributing
 
-We welcome contributions of any size, including new detection rules, editor
-integrations, and docs. See [CONTRIBUTING](CONTRIBUTING.md) to get started.
-Please also read our [Code of Conduct](CODE_OF_CONDUCT.md) and
-[Security Policy](SECURITY.md).
-
-### Development
-
-```bash
-python -m unittest discover -s tests -v
-```
+Contributions of any size are welcome — new detection rules, false-positive
+reports, docs, editor integrations. Start with [CONTRIBUTING](CONTRIBUTING.md).
+Please read our [Code of Conduct](CODE_OF_CONDUCT.md) and report security
+issues per our [Security Policy](SECURITY.md).
 
 ## Roadmap
 
-- [x] Pre-commit framework integration (`pre-commit-hooks.yaml`, `.pre-commit-config.yaml`)
-- [x] Editor/CI extensions (GitHub Actions for tests, lint, and secret scan)
-- [ ] SARIF output for GitHub code scanning
-- [ ] More languages & custom-rule manifests
+- [x] Rule-based detection (cloud keys, tokens, private keys)
+- [x] Entropy-based heuristics
+- [x] `.env` support (`.env`, `.env.*`, `*.env`, `*.env.*`)
+- [x] Masked output by default
+- [x] Git-index-aware `--staged` scanning
+- [x] git hook + pre-commit integration
+- [x] OIDC trusted publishing to PyPI
+- [ ] Git history scanning
 - [ ] Baseline / allowlist support
+- [ ] SARIF output for GitHub code scanning
+- [ ] Custom rule manifests
 
 ## License
 
