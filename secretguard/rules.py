@@ -83,7 +83,8 @@ RULES = [
         description="Twilio API key SID.",
     ),
     _r(
-        r"(?i)heroku[a-z0-9_.\-\t ]{0,30}(?:=|>|:=|\|\|:|<=|=>|:|\s)\s*['\"]?([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})['\"]?",
+        r"(?i)heroku[a-z0-9_.\-\t ]{0,30}(?:=|>|:=|\|\|:|<=|=>|:|\s)\s*"
+        r"['\"]?([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})['\"]?",
         "Heroku API Key",
         severity="high",
         description="Heroku API key or authorization token.",
