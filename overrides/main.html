@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block extrahead %}
+  {{ super() }}
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="secret-guard">
+  <meta property="og:title" content="secret-guard — open-source Python secret scanner">
+  <meta property="og:description"
+        content="Detect leaked API keys, AWS keys, GitHub tokens, passwords, and private keys before they reach git history. Zero-dependency, CI-ready, pre-commit ready. An open alternative to gitleaks and trufflehog.">
+  <meta property="og:url" content="{{ page.canonical_url }}">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="secret-guard — open-source Python secret scanner">
+  <meta name="twitter:description"
+        content="Detect leaked API keys, AWS keys, GitHub tokens, passwords, and private keys before they reach git history.">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "secret-guard",
+    "operatingSystem": "Windows, macOS, Linux",
+    "applicationCategory": "SecurityApplication",
+    "url": "https://taksh1507.github.io/secret-guard/",
+    "description": "Zero-dependency Python secret scanner that detects leaked API keys, AWS keys, GitHub tokens, passwords, and private keys before they reach git history.",
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+  }
+  </script>
+{% endblock %}
