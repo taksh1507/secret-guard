@@ -197,6 +197,21 @@ class DotenvKeyTest(unittest.TestCase):
         self.assertFalse(is_dotenv_path("environment.py"))
         self.assertFalse(is_dotenv_path("docs/env.md"))
 
+    def test_is_dotenv_path_excludes_committed_templates(self):
+        templates = [
+            ".env.example",
+            ".env.sample",
+            ".env.template",
+            ".env.dist",
+            ".env.local.example",
+            "config/.env.production.example",
+            "prod.ENV.example",
+        ]
+        for path in templates:
+            self.assertFalse(
+                is_dotenv_path(path), f"{path!r} should not be treated as a dotenv file"
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

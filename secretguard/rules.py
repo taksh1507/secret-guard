@@ -156,8 +156,15 @@ SECRET_KEY_PATTERN = re.compile(
 )
 
 
+DOTENV_TEMPLATE_RE = re.compile(
+    r"\.(?:example|sample|template|dist)(?:\.\w+)*$", re.IGNORECASE
+)
+
+
 def is_dotenv_path(rel_path):
     base = rel_path.rsplit("/", 1)[-1]
+    if DOTENV_TEMPLATE_RE.search(base) and re.search(r"\.env", base, re.IGNORECASE):
+        return False
     return bool(re.search(r"\.env(\.|$)", base, re.IGNORECASE))
 
 
