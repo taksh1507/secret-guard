@@ -13,7 +13,13 @@ SEVERITY_COLORS = {
 RESET = "\033[0m"
 
 
-def should_color():
+SCHEMA_VERSION = 1
+
+
+def should_color(force=None):
+    """force=True/False overrides auto-detection; None means auto (TTY + NO_COLOR)."""
+    if force is not None:
+        return force
     return sys.stdout.isatty() and os.environ.get("NO_COLOR") is None
 
 
@@ -22,9 +28,8 @@ def mask(value, visible=6):
         return "*" * len(value)
     return value[:visible] + "*" * max(0, len(value) - visible - 0)
 
-
-def format_console(findings, root, show_value=True):
-    color = should_color()
+def format_console(findings, root, show_value=True, color=None):
+    color = should_color(force=color)
     lines = []
     for finding in sorted(findings, key=lambda f: (f["path"], f["line"])):
         severity = finding["severity"]
@@ -79,10 +84,14 @@ def summarize(findings):
 
 
 def format_json(findings, root, show_value=False):
+    ordered = sorted(findings, key=lambda f: (f["path"], f["line"], f["rule"]))
     sanitized = []
-    for finding in findings:
+    for finding in ordered:
         item = dict(finding)
         if not show_value and not finding.get("reveal"):
             item["value"] = mask(item["value"])
         sanitized.append(item)
-    return json.dumps({"root": root, "findings": sanitized}, indent=2)
+    return json.dumps(
+        {"schema_version": SCHEMA_VERSION, "root": root, "findings": sanitized},
+        indent=2,
+    )

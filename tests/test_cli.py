@@ -1,5 +1,6 @@
 """End-to-end tests for the secret-guard command line."""
 
+import os
 import shutil
 import subprocess
 import sys
@@ -19,11 +20,14 @@ def run_git(repo, *args):
 
 class CliTest(unittest.TestCase):
     def run_cli(self, cwd, *args):
+        env = os.environ.copy()
+        env["PYTHONPATH"] = str(PROJECT_ROOT)
         return subprocess.run(
             [sys.executable, "-m", "secretguard", *args],
             capture_output=True,
             text=True,
             cwd=cwd,
+            env=env,
             check=False,
         )
 

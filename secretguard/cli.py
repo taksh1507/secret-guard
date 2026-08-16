@@ -60,6 +60,10 @@ def build_parser():
         help="Print full secret values (default masks them).",
     )
     scan.add_argument(
+        "--no-color", action="store_true",
+        help="Disable colored console output.",
+    )
+    scan.add_argument(
         "--staged", action="store_true",
         help="Scan only files staged in git.",
     )
@@ -131,7 +135,12 @@ def cmd_scan(args):
             )
         )
     else:
-        print(format_console(findings, args.path, show_value=args.show_value))
+        color = False if args.no_color else None
+        print(
+            format_console(
+                findings, args.path, show_value=args.show_value, color=color
+            )
+        )
     return 1 if findings else 0
 
 

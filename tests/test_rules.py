@@ -88,6 +88,54 @@ class RuleDetectionTest(unittest.TestCase):
             rule_names("sk-live-1234567890abcdefghijklmnopqrstuvwxyz"),
         )
 
+    def test_npm_token(self):
+        self.assertIn(
+            "npm Token",
+            rule_names("token = npm_" + "a" * 36),
+        )
+
+    def test_sendgrid_api_key(self):
+        self.assertIn(
+            "SendGrid API Key",
+            rule_names("key = SG." + "a" * 22 + "." + "b" * 43),
+        )
+
+    def test_twilio_api_key(self):
+        self.assertIn(
+            "Twilio API Key",
+            rule_names("api_key = SK" + "a" * 32),
+        )
+
+    def test_heroku_api_key(self):
+        self.assertIn(
+            "Heroku API Key",
+            rule_names("heroku_api_key = '00000000-0000-0000-0000-000000000000'"),
+        )
+        self.assertIn(
+            "Heroku API Key",
+            rule_names("heroku publish token 00000000-0000-0000-0000-000000000000"),
+        )
+
+    def test_digitalocean_token(self):
+        self.assertIn(
+            "DigitalOcean Token",
+            rule_names("token = dop_v1_" + "a" * 64),
+        )
+        self.assertIn(
+            "DigitalOcean Token",
+            rule_names("token = doo_v1_" + "a" * 64),
+        )
+
+    def test_hubspot_access_token(self):
+        self.assertIn(
+            "HubSpot Access Token",
+            rule_names("token = pat-na1-" + "a" * 32),
+        )
+        self.assertIn(
+            "HubSpot Access Token",
+            rule_names("token = pat-eu1-" + "a" * 32),
+        )
+
     def test_generic_secret_key(self):
         self.assertIn(
             "Generic Secret Key",
@@ -278,6 +326,8 @@ class DotenvValueParsingTest(unittest.TestCase):
         # Sanity check: is_dotenv_path still gates which files get parsed
         # this way; parsing logic itself doesn't care about the filename.
         self.assertFalse(is_dotenv_path("config.py"))
+
+
 
 
 
