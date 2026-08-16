@@ -1,0 +1,52 @@
+site_name: secret-guard
+site_description: "secret-guard — open-source, zero-dependency Python secret scanner. Detect leaked API keys, AWS keys, GitHub tokens, passwords, and private keys before they reach git history. A gitleaks/trufflehog alternative for CI and pre-commit."
+site_author: secret-guard contributors
+site_url: https://taksh1507.github.io/secret-guard/
+repo_url: https://github.com/taksh1507/secret-guard
+repo_name: taksh1507/secret-guard
+docs_dir: docs
+site_dir: site
+edit_uri: edit/main/docs/
+use_directory_urls: true
+
+theme:
+  name: material
+  palette:
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+  features:
+    - navigation.top
+    - navigation.sections
+    - search.highlight
+    - toc.follow
+
+nav:
+  - Home: index.md
+  - Getting Started: usage.md
+  - CLI Reference: cli.md
+  - Detection Rules: rules.md
+  - CI Integration: ci.md
+  - Contributing: contributing.md
+  - FAQ: faq.md
+
+markdown_extensions:
+  - admonition
+  - toc:
+      permalink: true
+  - pymdownx.superfences
+  - pymdownx.tasklist
+
+plugins:
+  - search
+  - tags
+  - minify:
+      minify_html: true
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/taksh1507/secret-guard
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/secret-guard-scan/
+  generator: false

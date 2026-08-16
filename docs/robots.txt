@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://taksh1507.github.io/secret-guard/sitemap.xml
