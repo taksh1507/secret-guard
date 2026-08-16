@@ -191,8 +191,11 @@ class DotenvKeyTest(unittest.TestCase):
         self.assertTrue(is_dotenv_path(".env"))
         self.assertTrue(is_dotenv_path(".env.production"))
         self.assertTrue(is_dotenv_path("config/staging.env"))
+        self.assertTrue(is_dotenv_path("config/app.env.development"))
+        self.assertTrue(is_dotenv_path("prod.ENV"))
         self.assertFalse(is_dotenv_path("src/main.py"))
         self.assertFalse(is_dotenv_path("environment.py"))
+        self.assertFalse(is_dotenv_path("docs/env.md"))
 
 
 if __name__ == "__main__":

@@ -86,21 +86,37 @@ def staged_files():
     return [line for line in result.stdout.splitlines() if line]
 
 
+def staged_content(path):
+    """Return the content of a file from the git index (the staged blob).
+
+    Reads from the index rather than the working tree, so a secret that was
+    staged but then changed or deleted locally is still detected.
+    """
+
+    result = subprocess.run(
+        ["git", "show", ":" + path],
+        capture_output=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        return None
+    try:
+        return result.stdout.decode("utf-8", errors="replace")
+    except (OSError, ValueError):
+        return None
+
+
 def cmd_scan(args):
     if args.staged:
         files = staged_files()
         scanner = Scanner(".", excludes=args.exclude)
         findings = []
         for rel in files:
-            if not os.path.isfile(rel):
-                continue
             candidate = os.path.relpath(rel, scanner.root).replace(os.sep, "/")
             if scanner._is_binary(candidate) or scanner._is_ignored(candidate):
                 continue
-            try:
-                with open(rel, encoding="utf-8", errors="replace") as handle:
-                    text = handle.read()
-            except (OSError, PermissionError):
+            text = staged_content(rel)
+            if text is None:
                 continue
             findings.extend(scanner.scan_text(rel, text))
     else:
@@ -109,7 +125,11 @@ def cmd_scan(args):
         findings = scanner.scan()
 
     if args.json:
-        print(format_json(findings, os.path.abspath(args.path)))
+        print(
+            format_json(
+                findings, os.path.abspath(args.path), show_value=args.show_value
+            )
+        )
     else:
         print(format_console(findings, args.path, show_value=args.show_value))
     return 1 if findings else 0

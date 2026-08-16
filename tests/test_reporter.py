@@ -113,11 +113,23 @@ class FormatConsoleTest(unittest.TestCase):
 
 
 class FormatJsonTest(unittest.TestCase):
-    def test_roundtrip(self):
-        findings = [finding(severity="high")]
-        payload = json.loads(format_json(findings, "/repo"))
+    def test_roundtrip_full_values(self):
+        findings = [finding(severity="high", value="ghp_secretvalue123")]
+        payload = json.loads(format_json(findings, "/repo", show_value=True))
         self.assertEqual(payload["root"], "/repo")
         self.assertEqual(payload["findings"], findings)
+
+    def test_values_masked_by_default(self):
+        findings = [finding(severity="high", value="ghp_secretvalue123")]
+        payload = json.loads(format_json(findings, "/repo"))
+        self.assertNotEqual(payload["findings"][0]["value"], findings[0]["value"])
+        self.assertNotIn("secretvalue", payload["findings"][0]["value"])
+
+    def test_reveal_findings_keep_value_in_json(self):
+        f = finding(value="GITHUB_TOKEN")
+        f["reveal"] = True
+        payload = json.loads(format_json([f], "/repo"))
+        self.assertEqual(payload["findings"][0]["value"], "GITHUB_TOKEN")
 
     def test_valid_json(self):
         report = format_json([], ".")

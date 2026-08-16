@@ -78,5 +78,11 @@ def summarize(findings):
     return counts
 
 
-def format_json(findings, root):
-    return json.dumps({"root": root, "findings": findings}, indent=2)
+def format_json(findings, root, show_value=False):
+    sanitized = []
+    for finding in findings:
+        item = dict(finding)
+        if not show_value and not finding.get("reveal"):
+            item["value"] = mask(item["value"])
+        sanitized.append(item)
+    return json.dumps({"root": root, "findings": sanitized}, indent=2)

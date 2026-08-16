@@ -72,8 +72,9 @@ app.py:40 [MEDIUM  ] Credential Assignment: password = 'hunter 2'
 1 critical, 1 high, 1 medium, 0 low — 3 total
 ```
 
-Secret values are **masked by default**. Use `--show-value` only when you need
-the full value (e.g. to rotate the key you just found).
+Secret values are **masked by default** in both the console report and the
+`--json` output. Use `--show-value` only when you need the full value (e.g. to
+rotate the key you just found).
 
 ## Usage
 

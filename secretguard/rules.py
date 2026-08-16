@@ -158,7 +158,7 @@ SECRET_KEY_PATTERN = re.compile(
 
 def is_dotenv_path(rel_path):
     base = rel_path.rsplit("/", 1)[-1]
-    return base == ".env" or base.startswith(".env.") or base.endswith(".env")
+    return bool(re.search(r"\.env(\.|$)", base, re.IGNORECASE))
 
 
 def dotenv_secret_assignments(text):
