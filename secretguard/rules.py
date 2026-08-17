@@ -5,9 +5,37 @@ import re
 
 Rule = dict
 
+# Rule ids used by --skip-rule / --only-rule for the rules that are not
+# regex-based (and so live outside RULES).
+ENTROPY_RULE_ID = "entropy"
+DOTENV_RULE_ID = "dotenv"
+SPECIAL_RULE_IDS = (ENTROPY_RULE_ID, DOTENV_RULE_ID)
+
+SPECIAL_RULES = {
+    ENTROPY_RULE_ID: {
+        "id": ENTROPY_RULE_ID,
+        "name": "High Entropy String",
+        "severity": "low",
+        "description": "Shannon-entropy heuristic for high-entropy strings.",
+    },
+    DOTENV_RULE_ID: {
+        "id": DOTENV_RULE_ID,
+        "name": "Environment File Secret",
+        "severity": "high",
+        "description": ".env file secret key assignment (value masked).",
+    },
+}
+
+
+def _slugify(name):
+    """Turn a rule name into a stable, CLI-friendly rule id."""
+
+    return re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+
 
 def _r(pattern, name, severity="medium", description=""):
     return {
+        "id": _slugify(name),
         "name": name,
         "pattern": re.compile(pattern, re.MULTILINE | re.IGNORECASE),
         "severity": severity,
@@ -172,10 +200,36 @@ def entropy_candidates(text):
             yield match.start(), match.end(), entropy, value
 
 
-def matches_rules(text):
-    """Run all regex rules against text, yield findings as (rule, match)."""
+def known_rule_ids():
+    """Return every rule id the scanner can run in a scan."""
 
-    for rule in RULES:
+    return [rule["id"] for rule in RULES] + list(SPECIAL_RULE_IDS)
+
+
+def unknown_rule_ids(rule_ids):
+    """Return the rule ids supplied on the CLI that do not exist."""
+
+    known = set(known_rule_ids())
+    return sorted({rule_id for rule_id in rule_ids if rule_id not in known})
+
+
+def matches_rules(text, skip_rules=None, only_rules=None):
+    """Run regex rules against text, honoring rule-id filters.
+
+    Only runs the intersection of `only_rules` (when given) with everything
+    except `skip_rules`. Yields findings as (rule, match).
+    """
+
+    skips = set(skip_rules or ())
+    if only_rules:
+        enabled = [
+            rule
+            for rule in RULES
+            if rule["id"] in only_rules and rule["id"] not in skips
+        ]
+    else:
+        enabled = [rule for rule in RULES if rule["id"] not in skips]
+    for rule in enabled:
         for match in rule["pattern"].finditer(text):
             yield rule, match
 

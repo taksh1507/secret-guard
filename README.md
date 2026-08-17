@@ -9,6 +9,7 @@ before they reach your git history.
 
 [![CI](https://github.com/taksh1507/secret-guard/actions/workflows/ci.yml/badge.svg)](https://github.com/taksh1507/secret-guard/actions/workflows/ci.yml)
 [![secret-guard scan](https://github.com/taksh1507/secret-guard/actions/workflows/scan.yml/badge.svg)](https://github.com/taksh1507/secret-guard/actions/workflows/scan.yml)
+[![codecov](https://codecov.io/gh/taksh1507/secret-guard/branch/main/graph/badge.svg)](https://codecov.io/gh/taksh1507/secret-guard)
 [![PyPI - Version](https://img.shields.io/pypi/v/secret-guard-scan)](https://pypi.org/project/secret-guard-scan/)
 [![PyPI - Python Versions](https://img.shields.io/pypi/pyversions/secret-guard-scan)](https://pypi.org/project/secret-guard-scan/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -45,6 +46,41 @@ the *key name* and severity but never the value.
   `.gitignore` already covers; repeatable `--exclude` for anything else.
 - **Entropy detection**: flags high-entropy strings even when no rule matches.
 - **Fast, single-file install**: works in CI in one line.
+
+## Why secret-guard?
+
+There are plenty of secret scanners. Here is where secret-guard sits among the
+popular ones:
+
+| | secret-guard | gitleaks | truffleHog | ggshield |
+| --- | :---: | :---: | :---: | :---: |
+| Zero runtime dependencies | ✅ | ❌ (Go binary) | ❌ (Python deps) | ❌ |
+| Runs in CI with one `pip install` | ✅ | ❌ (download binary) | ❌ | ❌ |
+| Regex + Shannon-entropy detection | ✅ | ⚠️ entropy via config | ✅ | ⚠️ |
+| Values masked by default | ✅ | ✅ | ✅ | ✅ |
+| `--staged` git-index scanning | ✅ | ⚠️ staged via git diff | ❌ | ✅ |
+| `.env` files flagged by key name | ✅ | ❌ | ❌ | ❌ |
+| Native pre-commit hook install | ✅ | ✅ | ❌ | ✅ |
+| Rule-level controls (`--skip-rule`) | ✅ | ✅ | ✅ | ✅ |
+| Works on Python ≥ 3.8 with no build step | ✅ | ❌ | ⚠️ | ⚠️ |
+
+**What makes secret-guard different:**
+
+1. **Zero dependencies, zero build step** — a single `pip install
+   secret-guard-scan` is all it takes, in CI or on a laptop. No Go toolchain,
+   no Docker image, no giant dependency tree to audit.
+2. **Values are masked by default** — including in `.env` files, where the
+   *key name* is reported but the value is never printed, even with
+   `--show-value`.
+3. **Git-index-aware `--staged`** — scans the staged *blob* (`git show :<path>`),
+   so a secret staged and then deleted from the worktree is still caught.
+4. **True false-positive controls** — `--skip-rule` and `--only-rule` scope a
+   scan to exactly the rules you care about, and unknown rule ids fail the
+   scan instead of being silently ignored.
+
+For teams that already run gitleaks in CI, secret-guard is a natural
+complement: a zero-install first line of defense in every pre-commit hook and
+every `pip install`-only CI job.
 
 ## Install
 
@@ -105,7 +141,30 @@ options:
   --json            Output findings as JSON
   --show-value      Print full secret values (default masks them)
   --staged          Scan only files staged in git
+  --skip-rule RULE  Never run the given rule id (repeatable)
+  --only-rule RULE  Run only the given rule id (repeatable)
+  --list-rules      List every available rule id and exit
 ```
+
+### Taming false positives
+
+Rule-based scanners are only useful when reviewers trust them. Use
+`--skip-rule` and `--only-rule` to scope a scan to exactly the rules you
+care about:
+
+```bash
+# Ignore a noisy rule entirely (e.g. GENERIC_SECRET_KEY on a test repo)
+secret-guard scan . --skip-rule generic-secret-key
+
+# Enforce only secrets that matter on a given path
+secret-guard scan ./infra --only-rule aws-access-key-id --only-rule github-token
+
+# See every rule id a scan can run
+secret-guard scan --list-rules
+```
+
+Passing an unknown rule id fails the scan with exit code `2` — so a
+typo'd `--skip-rule` can never silently disable detection.
 
 ### Exit codes
 

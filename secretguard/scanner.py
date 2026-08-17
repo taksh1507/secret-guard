@@ -11,6 +11,8 @@ except ImportError:  # pragma: no cover - optional dependency
     HAS_PATHSPEC = False
 
 from .rules import (
+    DOTENV_RULE_ID,
+    ENTROPY_RULE_ID,
     dotenv_secret_assignments,
     entropy_candidates,
     is_dotenv_path,
@@ -34,10 +36,19 @@ Finding = dict
 
 
 class Scanner:
-    def __init__(self, root, excludes=None, include_entropy=True):
+    def __init__(
+        self,
+        root,
+        excludes=None,
+        include_entropy=True,
+        skip_rules=None,
+        only_rules=None,
+    ):
         self.root = os.path.abspath(root)
         self.extra_excludes = set(excludes or [])
         self.include_entropy = include_entropy
+        self.skip_rules = set(skip_rules or [])
+        self.only_rules = set(only_rules or []) or None
         self._spec = None
         self._load_gitignore()
 
@@ -95,6 +106,25 @@ class Scanner:
             findings.extend(self.scan_text(rel_path, text))
         return findings
 
+    def _rule_enabled(self, rule_id, include_entropy=None):
+        """Whether a rule id should run given --skip-rule / --only-rule.
+
+        `include_entropy` is the --no-entropy flag (None means use the stored
+        include_entropy value); it only gates the entropy heuristic.
+        """
+
+        if rule_id in self.skip_rules:
+            return False
+        if self.only_rules is not None and rule_id not in self.only_rules:
+            return False
+        if rule_id == ENTROPY_RULE_ID:
+            enabled = (
+                self.include_entropy if include_entropy is None else include_entropy
+            )
+            if not enabled:
+                return False
+        return True
+
     def scan_text(self, rel_path, text):
         """Scan a single text blob for secrets (used by scan and staged scans).
 
@@ -104,7 +134,7 @@ class Scanner:
 
         findings = []
         key_lines = set()
-        if is_dotenv_path(rel_path):
+        if self._rule_enabled(DOTENV_RULE_ID) and is_dotenv_path(rel_path):
             base = os.path.basename(rel_path)
             for line_no, key, _value in dotenv_secret_assignments(text):
                 findings.append(
@@ -120,7 +150,9 @@ class Scanner:
                 )
                 key_lines.add(line_no)
 
-        for rule, match in matches_rules(text):
+        skip_rules = sorted(self.skip_rules)
+        only_rules = sorted(self.only_rules) if self.only_rules else None
+        for rule, match in matches_rules(text, skip_rules, only_rules):
             line = line_number(text, match.start())
             if line in key_lines:
                 continue
@@ -135,7 +167,7 @@ class Scanner:
                 )
             )
 
-        if self.include_entropy:
+        if self._rule_enabled(ENTROPY_RULE_ID):
             for start, _end, entropy, value in entropy_candidates(text):
                 line = line_number(text, start)
                 if line in key_lines:

@@ -20,6 +20,18 @@ jobs:
         run: pip install -e .
       - name: Run tests
         run: python -m unittest discover -s tests -v
+      - name: Coverage report
+        if: matrix.python-version == '3.13'
+        run: |
+          pip install coverage
+          coverage run -m unittest discover -s tests
+          coverage xml
+      - name: Upload coverage to Codecov
+        if: matrix.python-version == '3.13'
+        uses: codecov/codecov-action@v4
+        with:
+          files: coverage.xml
+          fail_ci_if_error: false
       - name: Smoke test
         run: |
           cd "$RUNNER_TEMP"

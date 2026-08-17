@@ -30,6 +30,44 @@ class ScannerTest(unittest.TestCase):
         kwargs.setdefault("root", self._tmp)
         return Scanner(**kwargs)
 
+    def test_skip_rule_suppresses_that_rule(self):
+        self.write("secret.py", f"token = {TOKEN}\naws = AKIAIOSFODNN7EXAMPLE")
+        scanner = self.make_scanner(skip_rules=["github-token"])
+        rules = [f["rule"] for f in scanner.scan()]
+        self.assertNotIn("GitHub Token", rules)
+        self.assertIn("AWS Access Key ID", rules)
+
+    def test_only_rule_runs_only_that_rule(self):
+        self.write("secret.py", f"token = {TOKEN}\naws = AKIAIOSFODNN7EXAMPLE")
+        scanner = self.make_scanner(only_rules=["aws-access-key-id"])
+        rules = [f["rule"] for f in scanner.scan()]
+        self.assertIn("AWS Access Key ID", rules)
+        self.assertNotIn("GitHub Token", rules)
+
+    def test_only_rule_can_disable_entropy(self):
+        high_entropy = "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2"
+        self.write("data.py", f"value = '{high_entropy}'")
+        self.assertTrue(self.make_scanner().scan())
+        scanner = self.make_scanner(only_rules=["github-token"])
+        self.assertEqual(scanner.scan(), [])
+
+    def test_skip_entropy_rule_id(self):
+        high_entropy = "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2"
+        self.write("data.py", f"value = '{high_entropy}'")
+        findings = self.make_scanner(skip_rules=["entropy"]).scan()
+        self.assertEqual(findings, [])
+
+    def test_skip_dotenv_rule_id(self):
+        self.write(".env", "GITHUB_TOKEN=value_that_must_not_leak\n")
+        findings = self.make_scanner(skip_rules=["dotenv"]).scan()
+        self.assertEqual(findings, [])
+
+    def test_only_dotenv_rule_id(self):
+        self.write(".env", "GITHUB_TOKEN=value_that_must_not_leak\n")
+        scanner = self.make_scanner(only_rules=["dotenv"])
+        rules = [f["rule"] for f in scanner.scan()]
+        self.assertIn("Environment File Secret", rules)
+
     def test_finds_secret_in_source_file(self):
         self.write("src/config.py", f'TOKEN = "{TOKEN}"')
         findings = self.make_scanner().scan()
