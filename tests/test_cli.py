@@ -240,6 +240,57 @@ class CliTest(unittest.TestCase):
             self.assertEqual(result.returncode, 1)
             self.assertIn("already exists", result.stderr)
 
+    def test_scan_baseline_suppression(self):
+        import hashlib
+        import json
+        with tempfile.TemporaryDirectory() as tmp:
+            # Create a file with a secret
+            test_file = Path(tmp, "test.py")
+            secret_val = "ghp_123456789012345678901234567890123456"
+            test_file.write_text(f"token = '{secret_val}'", encoding="utf-8")
+            
+            # Without baseline, it detects it
+            result = self.run_cli(tmp, "scan", "--only-rule", "github-token", ".")
+            self.assertEqual(result.returncode, 1)
+            
+            # Calculate secret hash
+            sec_hash = hashlib.sha256(secret_val.encode("utf-8")).hexdigest()
+            
+            # Create baseline file (hash matched)
+            baseline_file = Path(tmp, "baseline.json")
+            baseline_content = {
+                "baseline": [
+                    {
+                        "path": "test.py",
+                        "rule_id": "github-token",
+                        "hash": sec_hash
+                    }
+                ]
+            }
+            baseline_file.write_text(json.dumps(baseline_content), encoding="utf-8")
+            
+            # With baseline file, it is suppressed (exit code 0)
+            result2 = self.run_cli(tmp, "scan", "--only-rule", "github-token", "--baseline", str(baseline_file), ".")
+            self.assertEqual(result2.returncode, 0)
+
+            # Test baseline in secret-guard.json
+            config_file = Path(tmp, "secret-guard.json")
+            config_content = {
+                "only_rules": ["github-token"],
+                "baseline": [
+                    {
+                        "path": "test.py",
+                        "rule_id": "github-token",
+                        "hash": sec_hash
+                    }
+                ]
+            }
+            config_file.write_text(json.dumps(config_content), encoding="utf-8")
+            
+            # Runs automatically from config file, suppressed!
+            result3 = self.run_cli(tmp, "scan", ".")
+            self.assertEqual(result3.returncode, 0)
+
 
 if __name__ == "__main__":
     unittest.main()

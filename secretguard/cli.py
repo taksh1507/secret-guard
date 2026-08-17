@@ -4,7 +4,9 @@ import argparse
 import json
 import os
 import subprocess
+import hashlib
 import sys
+
 
 from . import __version__
 from .reporter import format_console, format_json
@@ -66,7 +68,7 @@ def load_config(config_path):
         print(f"Error: configuration root in {config_path} must be a JSON object.", file=sys.stderr)
         sys.exit(2)
         
-    known_keys = {"exclude", "no_entropy", "skip_rules", "only_rules", "//"}
+    known_keys = {"exclude", "no_entropy", "skip_rules", "only_rules", "baseline", "//"}
     for key in data:
         if key not in known_keys:
             print(f"Warning: Unknown configuration key '{key}' in {config_path}", file=sys.stderr)
@@ -86,6 +88,10 @@ def load_config(config_path):
     if "only_rules" in data:
         if not isinstance(data["only_rules"], list) or not all(isinstance(x, str) for x in data["only_rules"]):
             print(f"Error: 'only_rules' in {config_path} must be a list of strings.", file=sys.stderr)
+            sys.exit(2)
+    if "baseline" in data:
+        if not isinstance(data["baseline"], list) or not all(isinstance(x, dict) for x in data["baseline"]):
+            print(f"Error: 'baseline' in {config_path} must be a list of objects.", file=sys.stderr)
             sys.exit(2)
             
     return data
@@ -125,6 +131,10 @@ def build_parser():
     scan.add_argument(
         "--staged", action="store_true",
         help="Scan only files staged in git.",
+    )
+    scan.add_argument(
+        "--baseline", metavar="FILE",
+        help="Path to a baseline file containing allowed/suppressed secrets.",
     )
     scan.add_argument(
         "--skip-rule", action="append", default=[], metavar="RULE",
@@ -203,6 +213,30 @@ def list_rules():
     return 0
 
 
+def filter_baseline(findings, baseline):
+    if not baseline:
+        return findings
+
+    filtered = []
+    for f in findings:
+        val_hash = hashlib.sha256(f["value"].encode("utf-8")).hexdigest()
+        is_suppressed = False
+        for entry in baseline:
+            entry_path = entry.get("path", "").replace("\\", "/")
+            f_path = f["path"].replace("\\", "/")
+            if entry_path == f_path and entry.get("rule_id") == f.get("rule_id"):
+                if "hash" in entry:
+                    if entry["hash"] == val_hash:
+                        is_suppressed = True
+                        break
+                else:
+                    is_suppressed = True
+                    break
+        if not is_suppressed:
+            filtered.append(f)
+    return filtered
+
+
 def cmd_scan(args):
     scan_path = "." if args.staged else args.path
     config_file = find_config(scan_path)
@@ -236,6 +270,19 @@ def cmd_scan(args):
     if args.list_rules:
         return list_rules()
 
+    # Load baseline if provided via CLI or config file
+    baseline = []
+    if getattr(args, "baseline", None):
+        try:
+            with open(args.baseline, "r", encoding="utf-8") as f:
+                baseline_data = json.load(f)
+                baseline = baseline_data.get("baseline", [])
+        except Exception as e:
+            print(f"Error loading baseline file: {e}", file=sys.stderr)
+            return 2
+    else:
+        baseline = config.get("baseline", [])
+
     if args.staged:
         files = staged_files()
         scanner = Scanner(
@@ -262,6 +309,8 @@ def cmd_scan(args):
         )
         scanner.include_entropy = not no_entropy
         findings = scanner.scan()
+
+    findings = filter_baseline(findings, baseline)
 
     if args.json:
         print(
