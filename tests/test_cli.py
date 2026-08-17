@@ -164,6 +164,82 @@ class CliTest(unittest.TestCase):
             self.assertEqual(result.returncode, 2)
             self.assertIn("unknown rule id", result.stderr)
 
+    def test_scan_loads_valid_config(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            # Set up a config that excludes "wip" directory
+            Path(tmp, "secret-guard.json").write_text(
+                '{"exclude": ["wip"], "no_entropy": true}',
+                encoding="utf-8"
+            )
+            Path(tmp, "wip").mkdir()
+            Path(tmp, "wip", "secret.py").write_text(
+                f"TOKEN = '{SECRET}'", encoding="utf-8"
+            )
+            result = self.run_cli(tmp, "scan", ".")
+            self.assertEqual(result.returncode, 0) # Excluded, so clean!
+
+    def test_scan_cli_overrides_config(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            # Config skips "GitHub Token"
+            Path(tmp, "secret-guard.json").write_text(
+                '{"skip_rules": ["github-token"], "no_entropy": true}',
+                encoding="utf-8"
+            )
+            Path(tmp, "secret.py").write_text(
+                f"x = '{SECRET}'", encoding="utf-8"
+            )
+            # Without CLI flag, it is skipped
+            result = self.run_cli(tmp, "scan", ".")
+            self.assertEqual(result.returncode, 0)
+
+            # With CLI only-rule, it runs anyway (CLI overrides config)
+            result2 = self.run_cli(tmp, "scan", "--only-rule", "github-token", ".")
+            self.assertEqual(result2.returncode, 1)
+            self.assertIn("GitHub Token", result2.stdout)
+
+    def test_scan_config_warning_on_unknown_keys(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "secret-guard.json").write_text(
+                '{"unknown_key": "val"}',
+                encoding="utf-8"
+            )
+            result = self.run_cli(tmp, "scan", ".")
+            self.assertEqual(result.returncode, 0)
+            self.assertIn("Warning: Unknown configuration key 'unknown_key'", result.stderr)
+
+    def test_scan_config_malformed_json_errors(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "secret-guard.json").write_text(
+                '{"exclude": ',
+                encoding="utf-8"
+            )
+            result = self.run_cli(tmp, "scan", ".")
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("Error parsing", result.stderr)
+
+    def test_init_scaffolds_documented_starter_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            result = self.run_cli(tmp, "init")
+            self.assertEqual(result.returncode, 0)
+            config_file = Path(tmp, "secret-guard.json")
+            self.assertTrue(config_file.exists())
+            content = config_file.read_text(encoding="utf-8")
+            self.assertIn("Secret-Guard Configuration File", content)
+            
+            # Load and verify it's valid JSON
+            import json
+            data = json.loads(content)
+            self.assertIn("exclude", data)
+            self.assertIn("//", data)
+
+    def test_init_errors_if_file_exists(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config_file = Path(tmp, "secret-guard.json")
+            config_file.write_text("existing", encoding="utf-8")
+            result = self.run_cli(tmp, "init")
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("already exists", result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()

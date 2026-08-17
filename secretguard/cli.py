@@ -1,6 +1,7 @@
 """Command-line interface for secret-guard."""
 
 import argparse
+import json
 import os
 import subprocess
 import sys
@@ -31,6 +32,63 @@ def install_hook(target=".git/hooks/pre-commit"):
     os.chmod(hook_path, 0o755)
     print(f"Pre-commit hook installed at {hook_path}")
     return 0
+
+
+def find_config(start_path):
+    """Search upwards from start_path for secret-guard.json."""
+    curr = os.path.abspath(start_path)
+    if os.path.isfile(curr):
+        curr = os.path.dirname(curr)
+    while True:
+        config_file = os.path.join(curr, "secret-guard.json")
+        if os.path.isfile(config_file):
+            return config_file
+        parent = os.path.dirname(curr)
+        if parent == curr:
+            break
+        curr = parent
+    return None
+
+
+def load_config(config_path):
+    """Load and validate secret-guard.json."""
+    try:
+        with open(config_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except json.JSONDecodeError as e:
+        print(f"Error parsing {config_path}: {e}", file=sys.stderr)
+        sys.exit(2)
+    except Exception as e:
+        print(f"Error reading {config_path}: {e}", file=sys.stderr)
+        sys.exit(2)
+    
+    if not isinstance(data, dict):
+        print(f"Error: configuration root in {config_path} must be a JSON object.", file=sys.stderr)
+        sys.exit(2)
+        
+    known_keys = {"exclude", "no_entropy", "skip_rules", "only_rules", "//"}
+    for key in data:
+        if key not in known_keys:
+            print(f"Warning: Unknown configuration key '{key}' in {config_path}", file=sys.stderr)
+            
+    if "exclude" in data:
+        if not isinstance(data["exclude"], list) or not all(isinstance(x, str) for x in data["exclude"]):
+            print(f"Error: 'exclude' in {config_path} must be a list of strings.", file=sys.stderr)
+            sys.exit(2)
+    if "no_entropy" in data:
+        if not isinstance(data["no_entropy"], bool):
+            print(f"Error: 'no_entropy' in {config_path} must be a boolean.", file=sys.stderr)
+            sys.exit(2)
+    if "skip_rules" in data:
+        if not isinstance(data["skip_rules"], list) or not all(isinstance(x, str) for x in data["skip_rules"]):
+            print(f"Error: 'skip_rules' in {config_path} must be a list of strings.", file=sys.stderr)
+            sys.exit(2)
+    if "only_rules" in data:
+        if not isinstance(data["only_rules"], list) or not all(isinstance(x, str) for x in data["only_rules"]):
+            print(f"Error: 'only_rules' in {config_path} must be a list of strings.", file=sys.stderr)
+            sys.exit(2)
+            
+    return data
 
 
 def build_parser():
@@ -87,6 +145,11 @@ def build_parser():
     )
     hooks.set_defaults(func=cmd_install_hook)
 
+    init = subparsers.add_parser(
+        "init", help="Initialize a starter configuration file."
+    )
+    init.set_defaults(func=cmd_init)
+
     return parser
 
 
@@ -141,7 +204,23 @@ def list_rules():
 
 
 def cmd_scan(args):
-    unknown = unknown_rule_ids(args.skip_rule + args.only_rule)
+    scan_path = "." if args.staged else args.path
+    config_file = find_config(scan_path)
+    config = {}
+    if config_file:
+        config = load_config(config_file)
+
+    # CLI flags override config values
+    exclude = args.exclude if args.exclude else config.get("exclude", [])
+    if args.skip_rule or args.only_rule:
+        skip_rules = args.skip_rule
+        only_rules = args.only_rule
+    else:
+        skip_rules = config.get("skip_rules", [])
+        only_rules = config.get("only_rules", [])
+    no_entropy = args.no_entropy or config.get("no_entropy", False)
+
+    unknown = unknown_rule_ids(skip_rules + only_rules)
     if unknown:
         print(
             "unknown rule id{}: {}".format(
@@ -160,8 +239,10 @@ def cmd_scan(args):
     if args.staged:
         files = staged_files()
         scanner = Scanner(
-            ".", excludes=args.exclude, skip_rules=args.skip_rule,
-            only_rules=args.only_rule,
+            ".",
+            excludes=exclude,
+            skip_rules=skip_rules,
+            only_rules=only_rules,
         )
         findings = []
         for rel in files:
@@ -174,10 +255,12 @@ def cmd_scan(args):
             findings.extend(scanner.scan_text(rel, text))
     else:
         scanner = Scanner(
-            args.path, excludes=args.exclude, skip_rules=args.skip_rule,
-            only_rules=args.only_rule,
+            args.path,
+            excludes=exclude,
+            skip_rules=skip_rules,
+            only_rules=only_rules,
         )
-        scanner.include_entropy = not args.no_entropy
+        scanner.include_entropy = not no_entropy
         findings = scanner.scan()
 
     if args.json:
@@ -194,6 +277,31 @@ def cmd_scan(args):
             )
         )
     return 1 if findings else 0
+
+
+def cmd_init(args):
+    path = "secret-guard.json"
+    if os.path.exists(path):
+        print(f"Error: {path} already exists in the current directory.", file=sys.stderr)
+        return 1
+        
+    config_content = {
+        "//": "Secret-Guard Configuration File. Refer to https://github.com/taksh1507/secret-guard for details.",
+        "exclude": [],
+        "no_entropy": False,
+        "skip_rules": [],
+        "only_rules": []
+    }
+    
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(config_content, f, indent=2)
+            f.write("\n")
+        print(f"Initialized starter configuration at {path}")
+        return 0
+    except Exception as e:
+        print(f"Error writing starter configuration: {e}", file=sys.stderr)
+        return 1
 
 
 def cmd_install_hook(args):
