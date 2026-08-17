@@ -15,7 +15,7 @@
 secret-guard<span class=w> </span>scan
 </code></pre></div> <p>This scans the current directory, skips gitignored paths, and prints any findings with severity and a masked value:</p> <div class=highlight><pre><span></span><code>config.py:12 [HIGH    ] GitHub Token: ghp_**************
 .env:4    [CRITICAL] Private Key: -----BEGIN [REDACTED]-----
-app.py:40 [MEDIUM  ] Credential Assignment: password = &#39;hunter 2&#39;
+app.py:40 [MEDIUM  ] Credential Assignment: password = 'hunter 2'
 
 1 critical, 1 high, 1 medium, 0 low — 3 total
 </code></pre></div> <h2 id=skipping-heavy-or-generated-directories>Skipping heavy or generated directories<a class=headerlink href=#skipping-heavy-or-generated-directories title="Permanent link">&para;</a></h2> <p>Large folders such as <code>node_modules</code>, <code>.venv</code>, build caches, and ML artifacts should be excluded to keep scans fast:</p> <div class=highlight><pre><span></span><code>secret-guard<span class=w> </span>scan<span class=w> </span>.<span class=w> </span><span class=se>\</span>
