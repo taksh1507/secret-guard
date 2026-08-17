@@ -16,6 +16,7 @@
   "packages": {
     ".": {
       "package-name": "secret-guard-scan",
+      "include-component-in-tag": false,
       "extra-files": [
         {
           "type": "generic",
