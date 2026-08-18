@@ -42,6 +42,37 @@ jobs:
           fi
           echo "smoke test passed: scanner detected the seeded secret"
 
+  audit-workflows:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Validate action.yml schema and workflow YAML
+        run: |
+          pip install PyYAML
+          python - <<'PY'
+          import sys
+          import yaml
+
+          with open("action.yml", encoding="utf-8") as fh:
+              action = yaml.safe_load(fh)
+          assert action.get("name") == "secret-guard", "missing name"
+          assert action.get("description"), "missing description"
+          assert action.get("runs", {}).get("using") == "composite", "not a composite action"
+          for key in ("path", "exclude", "json", "no-entropy"):
+              assert key in action.get("inputs", {}), f"missing input {key!r}"
+          for step in action["runs"]["steps"]:
+              if "run" in step:
+                  assert step.get("shell") == "bash", f"step {step.get('name')} lacks bash shell"
+          for wf in ("ci.yml", "action-smoke.yml", "docker-publish.yml", "publish.yml", "release-please.yml", "secret-scan.yml"):
+              path = f".github/workflows/{wf}"
+              with open(path, encoding="utf-8") as fh:
+                  assert yaml.safe_load(fh) is not None, f"{path} is not valid YAML"
+          print("action.yml and workflows are valid")
+          PY
+
   lint:
     runs-on: ubuntu-latest
     steps:

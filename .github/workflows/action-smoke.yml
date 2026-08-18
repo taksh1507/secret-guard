@@ -1,0 +1,39 @@
+name: action-smoke
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Seed a fake secret outside the repo
+        run: |
+          printf "token = 'ghp_1234567890abcdefghijklmnopqrstuvwxyz'\n" > "$RUNNER_TEMP/seed.py"
+
+      - name: Run the action (it must detect the seed and fail)
+        id: scan
+        continue-on-error: true
+        uses: ./
+        with:
+          path: ${{ runner.temp }}
+
+      - name: Assert detection failed the scan
+        if: steps.scan.outcome != 'failure'
+        run: |
+          echo "expected the action to fail the job, but it succeeded" >&2
+          exit 1
+
+  no-leak-passes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Scan empty temp dir (must pass cleanly)
+        uses: ./
+        with:
+          path: ${{ runner.temp }}

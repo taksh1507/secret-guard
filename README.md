@@ -94,6 +94,64 @@ The CLI is `secret-guard`. You can also run the repo without installing
 ```bash
 python -m secretguard
 ```
+
+## GitHub Action
+
+The fastest way to add secret scanning to CI, no Docker or Python setup
+needed:
+
+```yaml
+- uses: taksh1507/secret-guard@v1
+```
+
+A leak fails the job. The scanner (and its Python runtime) are installed by
+the action itself.
+
+| Input | Default | Description |
+| --- | --- | --- |
+| `path` | `.` | File or directory to scan |
+| `exclude` | *(empty)* | Directory names to skip, one per line |
+| `json` | `false` | Emit findings as JSON (values still masked) |
+| `no-entropy` | `false` | Disable high-entropy string detection |
+
+Add it to an existing workflow:
+
+```yaml
+steps:
+  - uses: actions/checkout@v4
+  - uses: taksh1507/secret-guard@v1
+    with:
+      path: .
+      json: true
+      exclude: |
+        tests
+        .venv
+```
+
+### Reusable CI workflow
+
+Wrap the action in a reusable workflow your repos can call:
+
+```yaml
+# .github/workflows/secret-scan.yml — call from any repo
+on:
+  workflow_call:
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: taksh1507/secret-guard@v1
+```
+
+```yaml
+# Consumer: .github/workflows/ci.yml
+jobs:
+  security:
+    uses: taksh1507/secret-guard/.github/workflows/secret-scan.yml@main
+```
+
 ## Docker
 
 Run secret-guard in a container — no Python install required:
