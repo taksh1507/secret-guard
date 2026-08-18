@@ -144,6 +144,7 @@ options:
   --skip-rule RULE  Never run the given rule id (repeatable)
   --only-rule RULE  Run only the given rule id (repeatable)
   --list-rules      List every available rule id and exit
+  --baseline FILE   Suppress findings listed in a baseline file
 ```
 
 ### Taming false positives
@@ -165,6 +166,46 @@ secret-guard scan --list-rules
 
 Passing an unknown rule id fails the scan with exit code `2` — so a
 typo'd `--skip-rule` can never silently disable detection.
+
+### Configuration file (`secret-guard.json`)
+
+Prefer a checked-in config over repeating flags in CI. `secret-guard`
+discovers `secret-guard.json` in the scanned directory or any parent:
+
+```json
+{
+  "exclude": ["tests", ".venv"],
+  "no_entropy": false,
+  "skip_rules": ["generic-secret-key"],
+  "only_rules": [],
+  "baseline": []
+}
+```
+
+Command-line flags override config values. Scaffold a starter file with:
+
+```bash
+secret-guard init
+```
+
+### Baselines / allowlist
+
+A baseline lets you acknowledge known, intentional findings so CI stays
+green while new leaks still fail. A baseline file is a JSON document:
+
+```json
+{
+  "baseline": [
+    {"path": "config/rules.json", "rule_id": "generic-secret-key"}
+  ]
+}
+```
+
+`path` + `rule_id` suppress all matching findings; an optional `hash`
+(sha256 of the secret value) suppresses only that exact value. Load it with
+`--baseline baseline.json` or from the `baseline` key of `secret-guard.json`.
+Scanned values are hashed client-side, so the baseline never needs to
+contain the secret itself.
 
 ### Exit codes
 

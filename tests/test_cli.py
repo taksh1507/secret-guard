@@ -1,5 +1,7 @@
 """End-to-end tests for the secret-guard command line."""
 
+import hashlib
+import json
 import os
 import shutil
 import subprocess
@@ -205,7 +207,10 @@ class CliTest(unittest.TestCase):
             )
             result = self.run_cli(tmp, "scan", ".")
             self.assertEqual(result.returncode, 0)
-            self.assertIn("Warning: Unknown configuration key 'unknown_key'", result.stderr)
+            self.assertIn(
+                "Warning: Unknown configuration key 'unknown_key'",
+                result.stderr,
+            )
 
     def test_scan_config_malformed_json_errors(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -225,9 +230,8 @@ class CliTest(unittest.TestCase):
             self.assertTrue(config_file.exists())
             content = config_file.read_text(encoding="utf-8")
             self.assertIn("Secret-Guard Configuration File", content)
-            
+
             # Load and verify it's valid JSON
-            import json
             data = json.loads(content)
             self.assertIn("exclude", data)
             self.assertIn("//", data)
@@ -241,8 +245,6 @@ class CliTest(unittest.TestCase):
             self.assertIn("already exists", result.stderr)
 
     def test_scan_baseline_suppression(self):
-        import hashlib
-        import json
         with tempfile.TemporaryDirectory() as tmp:
             # Create a file with a secret
             test_file = Path(tmp, "test.py")
@@ -270,7 +272,15 @@ class CliTest(unittest.TestCase):
             baseline_file.write_text(json.dumps(baseline_content), encoding="utf-8")
             
             # With baseline file, it is suppressed (exit code 0)
-            result2 = self.run_cli(tmp, "scan", "--only-rule", "github-token", "--baseline", str(baseline_file), ".")
+            result2 = self.run_cli(
+                tmp,
+                "scan",
+                "--only-rule",
+                "github-token",
+                "--baseline",
+                str(baseline_file),
+                ".",
+            )
             self.assertEqual(result2.returncode, 0)
 
             # Test baseline in secret-guard.json

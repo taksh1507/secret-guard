@@ -1,12 +1,11 @@
 """Command-line interface for secret-guard."""
 
 import argparse
+import hashlib
 import json
 import os
 import subprocess
-import hashlib
 import sys
-
 
 from . import __version__
 from .reporter import format_console, format_json
@@ -38,11 +37,12 @@ def install_hook(target=".git/hooks/pre-commit"):
 
 def find_config(start_path):
     """Search upwards from start_path for secret-guard.json."""
+
     curr = os.path.abspath(start_path)
     if os.path.isfile(curr):
         curr = os.path.dirname(curr)
     while True:
-        config_file = os.path.join(curr, "secret-guard.json")
+        config_file = os.path.join(curr, CONFIG_FILENAME)
         if os.path.isfile(config_file):
             return config_file
         parent = os.path.dirname(curr)
@@ -52,48 +52,64 @@ def find_config(start_path):
     return None
 
 
+CONFIG_FILENAME = "secret-guard.json"
+KNOWN_CONFIG_KEYS = {
+    "//", "exclude", "no_entropy", "skip_rules", "only_rules", "baseline",
+}
+
+
+def _config_fatal(message):
+    print(message, file=sys.stderr)
+    sys.exit(2)
+
+
+def _require_list_of(data, key, expected_type, kind, config_path):
+    """Exit(2) unless data[key] is a list of expected_type items."""
+
+    value = data.get(key)
+    if value is None:
+        return
+    if not isinstance(value, list) or not all(
+        isinstance(x, expected_type) for x in value
+    ):
+        _config_fatal(
+            f"Error: '{key}' in {config_path} must be a list of {kind}."
+        )
+
+
 def load_config(config_path):
     """Load and validate secret-guard.json."""
+
     try:
-        with open(config_path, "r", encoding="utf-8") as f:
+        with open(config_path, encoding="utf-8") as f:
             data = json.load(f)
     except json.JSONDecodeError as e:
-        print(f"Error parsing {config_path}: {e}", file=sys.stderr)
-        sys.exit(2)
-    except Exception as e:
-        print(f"Error reading {config_path}: {e}", file=sys.stderr)
-        sys.exit(2)
-    
+        _config_fatal(f"Error parsing {config_path}: {e}")
+    except OSError as e:
+        _config_fatal(f"Error reading {config_path}: {e}")
+
     if not isinstance(data, dict):
-        print(f"Error: configuration root in {config_path} must be a JSON object.", file=sys.stderr)
-        sys.exit(2)
-        
-    known_keys = {"exclude", "no_entropy", "skip_rules", "only_rules", "baseline", "//"}
+        _config_fatal(
+            "Error: configuration root in "
+            f"{config_path} must be a JSON object."
+        )
+
     for key in data:
-        if key not in known_keys:
-            print(f"Warning: Unknown configuration key '{key}' in {config_path}", file=sys.stderr)
-            
-    if "exclude" in data:
-        if not isinstance(data["exclude"], list) or not all(isinstance(x, str) for x in data["exclude"]):
-            print(f"Error: 'exclude' in {config_path} must be a list of strings.", file=sys.stderr)
-            sys.exit(2)
-    if "no_entropy" in data:
-        if not isinstance(data["no_entropy"], bool):
-            print(f"Error: 'no_entropy' in {config_path} must be a boolean.", file=sys.stderr)
-            sys.exit(2)
-    if "skip_rules" in data:
-        if not isinstance(data["skip_rules"], list) or not all(isinstance(x, str) for x in data["skip_rules"]):
-            print(f"Error: 'skip_rules' in {config_path} must be a list of strings.", file=sys.stderr)
-            sys.exit(2)
-    if "only_rules" in data:
-        if not isinstance(data["only_rules"], list) or not all(isinstance(x, str) for x in data["only_rules"]):
-            print(f"Error: 'only_rules' in {config_path} must be a list of strings.", file=sys.stderr)
-            sys.exit(2)
-    if "baseline" in data:
-        if not isinstance(data["baseline"], list) or not all(isinstance(x, dict) for x in data["baseline"]):
-            print(f"Error: 'baseline' in {config_path} must be a list of objects.", file=sys.stderr)
-            sys.exit(2)
-            
+        if key not in KNOWN_CONFIG_KEYS:
+            print(
+                f"Warning: Unknown configuration key '{key}' in "
+                f"{config_path}",
+                file=sys.stderr,
+            )
+
+    _require_list_of(data, "exclude", str, "strings", config_path)
+    if "no_entropy" in data and not isinstance(data["no_entropy"], bool):
+        _config_fatal(
+            f"Error: 'no_entropy' in {config_path} must be a boolean."
+        )
+    _require_list_of(data, "skip_rules", str, "strings", config_path)
+    _require_list_of(data, "only_rules", str, "strings", config_path)
+    _require_list_of(data, "baseline", dict, "objects", config_path)
     return data
 
 
@@ -237,6 +253,20 @@ def filter_baseline(findings, baseline):
     return filtered
 
 
+def resolve_baseline(args, config):
+    """Return the list of suppressed findings from CLI --baseline or config."""
+
+    baseline_path = getattr(args, "baseline", None)
+    if baseline_path:
+        try:
+            with open(baseline_path, encoding="utf-8") as f:
+                return json.load(f).get("baseline", [])
+        except (OSError, json.JSONDecodeError, AttributeError) as e:
+            print(f"Error loading baseline file: {e}", file=sys.stderr)
+            sys.exit(2)
+    return config.get("baseline", [])
+
+
 def cmd_scan(args):
     scan_path = "." if args.staged else args.path
     config_file = find_config(scan_path)
@@ -270,18 +300,7 @@ def cmd_scan(args):
     if args.list_rules:
         return list_rules()
 
-    # Load baseline if provided via CLI or config file
-    baseline = []
-    if getattr(args, "baseline", None):
-        try:
-            with open(args.baseline, "r", encoding="utf-8") as f:
-                baseline_data = json.load(f)
-                baseline = baseline_data.get("baseline", [])
-        except Exception as e:
-            print(f"Error loading baseline file: {e}", file=sys.stderr)
-            return 2
-    else:
-        baseline = config.get("baseline", [])
+    baseline = resolve_baseline(args, config)
 
     if args.staged:
         files = staged_files()
@@ -329,26 +348,32 @@ def cmd_scan(args):
 
 
 def cmd_init(args):
-    path = "secret-guard.json"
+    path = CONFIG_FILENAME
     if os.path.exists(path):
-        print(f"Error: {path} already exists in the current directory.", file=sys.stderr)
+        print(
+            f"Error: {path} already exists in the current directory.",
+            file=sys.stderr,
+        )
         return 1
-        
+
     config_content = {
-        "//": "Secret-Guard Configuration File. Refer to https://github.com/taksh1507/secret-guard for details.",
+        "//": (
+            "Secret-Guard Configuration File. Refer to "
+            "https://github.com/taksh1507/secret-guard for details."
+        ),
         "exclude": [],
         "no_entropy": False,
         "skip_rules": [],
-        "only_rules": []
+        "only_rules": [],
     }
-    
+
     try:
         with open(path, "w", encoding="utf-8") as f:
             json.dump(config_content, f, indent=2)
             f.write("\n")
         print(f"Initialized starter configuration at {path}")
         return 0
-    except Exception as e:
+    except OSError as e:
         print(f"Error writing starter configuration: {e}", file=sys.stderr)
         return 1
 
