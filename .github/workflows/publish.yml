@@ -13,7 +13,18 @@ jobs:
   build:
     name: Build distribution
     runs-on: ubuntu-latest
+    outputs:
+      tag_ok: ${{ steps.check.outputs.tag_ok }}
     steps:
+      - name: Check release tag
+        id: check
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" || "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+            echo "tag_ok=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag_ok=false" >> "$GITHUB_OUTPUT"
+            echo "Skipping publish: $GITHUB_REF_NAME is not a vX.Y.Z release tag"
+          fi
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
@@ -32,6 +43,7 @@ jobs:
   publish:
     name: Publish to PyPI
     needs: build
+    if: needs.build.outputs.tag_ok == 'true'
     runs-on: ubuntu-latest
     environment:
       name: pypi
