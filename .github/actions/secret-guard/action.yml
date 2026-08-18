@@ -1,0 +1,57 @@
+name: secret-guard
+description: Scan a repository for leaked secrets — GitHub tokens, AWS keys, private keys, and high-entropy strings.
+author: taksh1507
+
+inputs:
+  path:
+    description: File or directory to scan.
+    required: false
+    default: "."
+  exclude:
+    description: Directory names to skip, one per line.
+    required: false
+    default: ""
+  json:
+    description: Emit findings as JSON. Values stay masked unless --show-value is used.
+    required: false
+    default: "false"
+  no-entropy:
+    description: Disable high-entropy string detection.
+    required: false
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+
+    - name: Install secret-guard
+      run: pip install --upgrade secret-guard-scan
+      shell: bash
+
+    - name: Run secret-guard scan
+      id: scan
+      env:
+        INPUT_PATH: ${{ inputs.path }}
+        INPUT_EXCLUDE: ${{ inputs.exclude }}
+      run: |
+        extra=()
+        [ "$INPUT_EXCLUDE" != "" ] && while IFS= read -r dir; do
+          [ -n "$dir" ] && extra+=(--exclude "$dir")
+        done <<< "$INPUT_EXCLUDE"
+        if [ "${{ inputs.no-entropy }}" = "true" ]; then
+          extra+=(--no-entropy)
+        fi
+        if [ "${{ inputs.json }}" = "true" ]; then
+          secret-guard scan --json "${extra[@]}" "$INPUT_PATH"
+        else
+          secret-guard scan "${extra[@]}" "$INPUT_PATH"
+        fi
+      shell: bash
+
+branding:
+  icon: shield
+  color: purple
