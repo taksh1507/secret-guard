@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/taksh1507/secret-guard/compare/v0.3.0...v0.3.1) (2026-08-18)
+
+
+### Miscellaneous Chores
+
+* allow manual dispatch of docker-publish ([#41](https://github.com/taksh1507/secret-guard/issues/41)) ([4a4c0c9](https://github.com/taksh1507/secret-guard/commit/4a4c0c9d375ca6a501e8fd22a47e844801ecee4d))
+
 ## [0.3.0](https://github.com/taksh1507/secret-guard/compare/v0.2.0...v0.3.0) (2026-08-18)
 
 
