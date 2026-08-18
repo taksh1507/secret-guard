@@ -29,9 +29,9 @@ jobs:
       - name: Upload coverage to Codecov
         if: matrix.python-version == '3.13'
         uses: codecov/codecov-action@v4
-        with:
-          files: coverage.xml
-          fail_ci_if_error: false
+with:
+            files: coverage.xml
+            fail_ci_if_error: false
       - name: Smoke test
         run: |
           cd "$RUNNER_TEMP"
@@ -56,7 +56,7 @@ jobs:
           import sys
           import yaml
 
-          with open("action.yml", encoding="utf-8") as fh:
+          with open(".github/actions/secret-guard/action.yml", encoding="utf-8") as fh:
               action = yaml.safe_load(fh)
           assert action.get("name") == "secret-guard", "missing name"
           assert action.get("description"), "missing description"
