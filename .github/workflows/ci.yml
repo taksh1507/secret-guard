@@ -29,9 +29,9 @@ jobs:
       - name: Upload coverage to Codecov
         if: matrix.python-version == '3.13'
         uses: codecov/codecov-action@v4
-with:
-            files: coverage.xml
-            fail_ci_if_error: false
+        with:
+          files: coverage.xml
+          fail_ci_if_error: false
       - name: Smoke test
         run: |
           cd "$RUNNER_TEMP"
