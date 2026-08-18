@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/taksh1507/secret-guard/compare/v0.3.0...v0.3.1) (2026-08-18)
+
+
+### Bug Fixes
+
+* point smoke CI and audit at relocated action ([#44](https://github.com/taksh1507/secret-guard/issues/44)) ([bdc4c41](https://github.com/taksh1507/secret-guard/commit/bdc4c41ad9ca467b29a0bb46da468f9b44398ddd))
+
 ## [0.3.0](https://github.com/taksh1507/secret-guard/compare/v0.2.0...v0.3.0) (2026-08-18)
 
 
