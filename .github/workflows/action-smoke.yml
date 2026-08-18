@@ -13,14 +13,17 @@ jobs:
 
       - name: Seed a fake secret outside the repo
         run: |
-          printf "token = 'ghp_1234567890abcdefghijklmnopqrstuvwxyz'\n" > "$RUNNER_TEMP/seed.py"
+          mkdir -p "$RUNNER_TEMP/sg-seed"
+          prefix="ghp_"
+          printf "token = '%s%s'\n" "$prefix" "1234567890abcdefghijklmnopqrstuvwxyz" \
+            > "$RUNNER_TEMP/sg-seed/seed.py"
 
       - name: Run the action (it must detect the seed and fail)
         id: scan
         continue-on-error: true
         uses: ./
         with:
-          path: ${{ runner.temp }}
+          path: ${{ runner.temp }}/sg-seed
 
       - name: Assert detection failed the scan
         if: steps.scan.outcome != 'failure'
@@ -28,12 +31,28 @@ jobs:
           echo "expected the action to fail the job, but it succeeded" >&2
           exit 1
 
-  no-leak-passes:
+  exclude-input:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Scan empty temp dir (must pass cleanly)
+      - name: Seed a fake secret inside an excluded subdir
+        run: |
+          mkdir -p "$RUNNER_TEMP/sg-excluded/sub"
+          prefix="ghp_"
+          printf "token = '%s%s'\n" "$prefix" "1234567890abcdefghijklmnopqrstuvwxyz" \
+            > "$RUNNER_TEMP/sg-excluded/sub/seed.py"
+
+      - name: Run the action with the secret excluded (must pass)
+        id: scan
+        continue-on-error: true
         uses: ./
         with:
-          path: ${{ runner.temp }}
+          path: ${{ runner.temp }}/sg-excluded
+          exclude: sub
+
+      - name: Assert the excluded scan passed
+        if: steps.scan.outcome != 'success'
+        run: |
+          echo "expected the excluded scan to pass, but it failed" >&2
+          exit 1
