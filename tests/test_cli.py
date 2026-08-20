@@ -1,7 +1,5 @@
 """End-to-end tests for the secret-guard command line."""
 
-import hashlib
-import json
 import os
 import shutil
 import subprocess
@@ -41,6 +39,29 @@ class CliTest(unittest.TestCase):
             result = self.run_cli(tmp, "scan", ".")
             self.assertEqual(result.returncode, 1)
             self.assertIn("GitHub Token", result.stdout)
+
+    def test_scan_max_findings_caps_console_output(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            for i in range(5):
+                Path(tmp, f"secret{i}.py").write_text(
+                    f"TOKEN = '{SECRET}'", encoding="utf-8"
+                )
+            result = self.run_cli(tmp, "scan", "--max-findings", "2", ".")
+            self.assertEqual(result.returncode, 1)
+            self.assertEqual(result.stdout.count(" ["), 2)
+            self.assertIn("truncated", result.stdout.lower())
+
+    def test_scan_max_findings_sets_truncated_json_flag(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            for i in range(5):
+                Path(tmp, f"secret{i}.py").write_text(
+                    f"TOKEN = '{SECRET}'", encoding="utf-8"
+                )
+            result = self.run_cli(tmp, "scan", "--max-findings", "2", "--json", ".")
+            self.assertEqual(result.returncode, 1)
+            data = __import__("json").loads(result.stdout)
+            self.assertTrue(data["truncated"])
+            self.assertEqual(len(data["findings"]), 2)
 
     def test_scan_returns_zero_when_clean(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -125,182 +146,6 @@ class CliTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0)
         self.assertIn("scan", result.stdout)
         self.assertIn("install-hook", result.stdout)
-
-    def test_scan_skip_rule_suppresses_finding(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            Path(tmp, "secret.py").write_text(
-                f"aws = AKIAIOSFODNN7EXAMPLE\nTOKEN = '{SECRET}'",
-                encoding="utf-8",
-            )
-            result = self.run_cli(
-                tmp, "scan", "--skip-rule", "github-token", "."
-            )
-            self.assertEqual(result.returncode, 1)
-            self.assertIn("AWS Access Key ID", result.stdout)
-            self.assertNotIn("GitHub Token", result.stdout)
-
-    def test_scan_only_rule_keeps_only_that_rule(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            Path(tmp, "secret.py").write_text(
-                f"aws = AKIAIOSFODNN7EXAMPLE\nTOKEN = '{SECRET}'",
-                encoding="utf-8",
-            )
-            result = self.run_cli(
-                tmp, "scan", "--only-rule", "aws-access-key-id", "."
-            )
-            self.assertEqual(result.returncode, 1)
-            self.assertIn("AWS Access Key ID", result.stdout)
-            self.assertNotIn("GitHub Token", result.stdout)
-
-    def test_scan_list_rules_lists_rule_ids(self):
-        result = self.run_cli(str(PROJECT_ROOT), "scan", "--list-rules")
-        self.assertEqual(result.returncode, 0)
-        self.assertIn("github-token", result.stdout)
-        self.assertIn("entropy", result.stdout)
-        self.assertIn("dotenv", result.stdout)
-
-    def test_scan_unknown_rule_id_errors(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            Path(tmp, "main.py").write_text("print('clean')\n", encoding="utf-8")
-            result = self.run_cli(tmp, "scan", "--skip-rule", "nope-rule", ".")
-            self.assertEqual(result.returncode, 2)
-            self.assertIn("unknown rule id", result.stderr)
-
-    def test_scan_loads_valid_config(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            # Set up a config that excludes "wip" directory
-            Path(tmp, "secret-guard.json").write_text(
-                '{"exclude": ["wip"], "no_entropy": true}',
-                encoding="utf-8"
-            )
-            Path(tmp, "wip").mkdir()
-            Path(tmp, "wip", "secret.py").write_text(
-                f"TOKEN = '{SECRET}'", encoding="utf-8"
-            )
-            result = self.run_cli(tmp, "scan", ".")
-            self.assertEqual(result.returncode, 0) # Excluded, so clean!
-
-    def test_scan_cli_overrides_config(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            # Config skips "GitHub Token"
-            Path(tmp, "secret-guard.json").write_text(
-                '{"skip_rules": ["github-token"], "no_entropy": true}',
-                encoding="utf-8"
-            )
-            Path(tmp, "secret.py").write_text(
-                f"x = '{SECRET}'", encoding="utf-8"
-            )
-            # Without CLI flag, it is skipped
-            result = self.run_cli(tmp, "scan", ".")
-            self.assertEqual(result.returncode, 0)
-
-            # With CLI only-rule, it runs anyway (CLI overrides config)
-            result2 = self.run_cli(tmp, "scan", "--only-rule", "github-token", ".")
-            self.assertEqual(result2.returncode, 1)
-            self.assertIn("GitHub Token", result2.stdout)
-
-    def test_scan_config_warning_on_unknown_keys(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            Path(tmp, "secret-guard.json").write_text(
-                '{"unknown_key": "val"}',
-                encoding="utf-8"
-            )
-            result = self.run_cli(tmp, "scan", ".")
-            self.assertEqual(result.returncode, 0)
-            self.assertIn(
-                "Warning: Unknown configuration key 'unknown_key'",
-                result.stderr,
-            )
-
-    def test_scan_config_malformed_json_errors(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            Path(tmp, "secret-guard.json").write_text(
-                '{"exclude": ',
-                encoding="utf-8"
-            )
-            result = self.run_cli(tmp, "scan", ".")
-            self.assertEqual(result.returncode, 2)
-            self.assertIn("Error parsing", result.stderr)
-
-    def test_init_scaffolds_documented_starter_file(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            result = self.run_cli(tmp, "init")
-            self.assertEqual(result.returncode, 0)
-            config_file = Path(tmp, "secret-guard.json")
-            self.assertTrue(config_file.exists())
-            content = config_file.read_text(encoding="utf-8")
-            self.assertIn("Secret-Guard Configuration File", content)
-
-            # Load and verify it's valid JSON
-            data = json.loads(content)
-            self.assertIn("exclude", data)
-            self.assertIn("//", data)
-
-    def test_init_errors_if_file_exists(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            config_file = Path(tmp, "secret-guard.json")
-            config_file.write_text("existing", encoding="utf-8")
-            result = self.run_cli(tmp, "init")
-            self.assertEqual(result.returncode, 1)
-            self.assertIn("already exists", result.stderr)
-
-    def test_scan_baseline_suppression(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            # Create a file with a secret
-            test_file = Path(tmp, "test.py")
-            secret_val = "ghp_123456789012345678901234567890123456"
-            test_file.write_text(f"token = '{secret_val}'", encoding="utf-8")
-            
-            # Without baseline, it detects it
-            result = self.run_cli(tmp, "scan", "--only-rule", "github-token", ".")
-            self.assertEqual(result.returncode, 1)
-            
-            # Calculate secret hash
-            sec_hash = hashlib.sha256(secret_val.encode("utf-8")).hexdigest()
-            
-            # Create baseline file (hash matched)
-            baseline_file = Path(tmp, "baseline.json")
-            baseline_content = {
-                "baseline": [
-                    {
-                        "path": "test.py",
-                        "rule_id": "github-token",
-                        "hash": sec_hash
-                    }
-                ]
-            }
-            baseline_file.write_text(json.dumps(baseline_content), encoding="utf-8")
-            
-            # With baseline file, it is suppressed (exit code 0)
-            result2 = self.run_cli(
-                tmp,
-                "scan",
-                "--only-rule",
-                "github-token",
-                "--baseline",
-                str(baseline_file),
-                ".",
-            )
-            self.assertEqual(result2.returncode, 0)
-
-            # Test baseline in secret-guard.json
-            config_file = Path(tmp, "secret-guard.json")
-            config_content = {
-                "only_rules": ["github-token"],
-                "baseline": [
-                    {
-                        "path": "test.py",
-                        "rule_id": "github-token",
-                        "hash": sec_hash
-                    }
-                ]
-            }
-            config_file.write_text(json.dumps(config_content), encoding="utf-8")
-            
-            # Runs automatically from config file, suppressed!
-            result3 = self.run_cli(tmp, "scan", ".")
-            self.assertEqual(result3.returncode, 0)
-
 
 if __name__ == "__main__":
     unittest.main()

@@ -149,20 +149,25 @@ def build_parser():
         help="Scan only files staged in git.",
     )
     scan.add_argument(
-        "--baseline", metavar="FILE",
-        help="Path to a baseline file containing allowed/suppressed secrets.",
+        "--max-findings", type=int, default=None,
+        metavar="N", 
+                help="Print only the first N findings (exit code still reflects all).",
     )
     scan.add_argument(
-        "--skip-rule", action="append", default=[], metavar="RULE",
-        help="Never run the given rule id (repeatable). Mixes with --only-rule.",
+        "--skip-rule", action="append", default=[],
+        metavar="RULE_ID", help="Rule id to skip (repeatable).",
     )
     scan.add_argument(
-        "--only-rule", action="append", default=[], metavar="RULE",
-        help="Run only the given rule id (repeatable).",
+        "--only-rule", action="append", default=[],
+        metavar="RULE_ID", help="Only run this rule id (repeatable).",
     )
     scan.add_argument(
         "--list-rules", action="store_true",
         help="List every available rule id and exit.",
+    )
+    scan.add_argument(
+        "--baseline", default=None,
+        metavar="FILE", help="Path to a baseline file of findings to suppress.",
     )
     scan.set_defaults(func=cmd_scan)
 
@@ -218,7 +223,7 @@ def list_rules():
     def fmt(info):
         return "  {:<30} {:<30} {:>8}  {}".format(
             info["id"], info["name"], info["severity"].upper(), info["description"]
-)
+        )
 
     print("Regex rules:")
     for rule in RULES:
@@ -334,14 +339,16 @@ def cmd_scan(args):
     if args.json:
         print(
             format_json(
-                findings, os.path.abspath(args.path), show_value=args.show_value
+                findings, os.path.abspath(args.path),
+                show_value=args.show_value, max_findings=args.max_findings,
             )
         )
     else:
-        color = False if args.no_color else None
         print(
             format_console(
-                findings, args.path, show_value=args.show_value, color=color
+                findings, args.path,
+                show_value=args.show_value, max_findings=args.max_findings,
+                color=(False if args.no_color else None),
             )
         )
     return 1 if findings else 0
