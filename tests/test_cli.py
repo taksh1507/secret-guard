@@ -301,6 +301,74 @@ class CliTest(unittest.TestCase):
             result3 = self.run_cli(tmp, "scan", ".")
             self.assertEqual(result3.returncode, 0)
 
+    def test_stdin_scan_detects_secret(self):
+        result = subprocess.run(
+                [sys.executable, "-m", "secretguard", "scan", "--stdin"],
+                input=f"TOKEN = '{SECRET}'",
+                capture_output=True,
+                text=True,
+                cwd=str(PROJECT_ROOT),
+                env={**os.environ, "PYTHONPATH": str(PROJECT_ROOT)},
+                check=False,
+            )
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("GitHub Token", result.stdout)
+        self.assertNotIn(SECRET, result.stdout)
+
+    def test_stdin_scan_clean_input_returns_zero(self):
+        result = subprocess.run(
+            [sys.executable, "-m", "secretguard", "scan", "--stdin"],
+            input="print('hello')\n",
+            capture_output=True,
+            text=True,
+            cwd=str(PROJECT_ROOT),
+            env={**os.environ, "PYTHONPATH": str(PROJECT_ROOT)},
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("0 total", result.stdout)
+
+    def test_stdin_scan_reports_default_filename(self):
+        result = subprocess.run(
+            [sys.executable, "-m", "secretguard", "scan", "--stdin"],
+            input=f"TOKEN = '{SECRET}'",
+            capture_output=True,
+            text=True,
+            cwd=str(PROJECT_ROOT),
+            env={**os.environ, "PYTHONPATH": str(PROJECT_ROOT)},
+            check=False,
+        )
+        self.assertIn("stdin:1", result.stdout)
+
+    def test_stdin_scan_reports_custom_filename(self):
+        result = subprocess.run(
+            [
+                sys.executable, "-m", "secretguard", "scan",
+                "--stdin", "--filename", "config.js",
+            ],
+            input=f"TOKEN = '{SECRET}'",
+            capture_output=True,
+            text=True,
+            cwd=str(PROJECT_ROOT),
+            env={**os.environ, "PYTHONPATH": str(PROJECT_ROOT)},
+            check=False,
+        )
+        self.assertIn("config.js:1", result.stdout)
+
+    def test_stdin_scan_json_masks_by_default(self):
+        result = subprocess.run(
+            [sys.executable, "-m", "secretguard", "scan", "--stdin", "--json"],
+            input=f"TOKEN = '{SECRET}'",
+            capture_output=True,
+            text=True,
+            cwd=str(PROJECT_ROOT),
+            env={**os.environ, "PYTHONPATH": str(PROJECT_ROOT)},
+            check=False,
+        )
+        self.assertEqual(result.returncode, 1)
+        self.assertNotIn(SECRET, result.stdout)
+        self.assertIsNotNone(json.loads(result.stdout))
+
 
 if __name__ == "__main__":
     unittest.main()
