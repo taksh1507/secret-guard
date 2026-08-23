@@ -164,6 +164,14 @@ def build_parser():
         "--list-rules", action="store_true",
         help="List every available rule id and exit.",
     )
+    scan.add_argument(
+        "--stdin", action="store_true",
+        help="Scan input from standard input (stdin) instead of path.",
+    )
+    scan.add_argument(
+        "--filename", default="stdin",
+        help="Filename to associate with stdin input (default: stdin).",
+    )
     scan.set_defaults(func=cmd_scan)
 
     hooks = subparsers.add_parser(
@@ -302,7 +310,17 @@ def cmd_scan(args):
 
     baseline = resolve_baseline(args, config)
 
-    if args.staged:
+    if args.stdin:
+        text = sys.stdin.read()
+        scanner = Scanner(
+            ".",
+            excludes=exclude,
+            skip_rules=skip_rules,
+            only_rules=only_rules,
+        )
+        scanner.include_entropy = not no_entropy
+        findings = scanner.scan_text(args.filename, text)
+    elif args.staged:
         files = staged_files()
         scanner = Scanner(
             ".",

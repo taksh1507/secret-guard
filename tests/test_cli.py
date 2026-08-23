@@ -21,11 +21,12 @@ def run_git(repo, *args):
 
 
 class CliTest(unittest.TestCase):
-    def run_cli(self, cwd, *args):
+    def run_cli(self, cwd, *args, stdin_input=None):
         env = os.environ.copy()
         env["PYTHONPATH"] = str(PROJECT_ROOT)
         return subprocess.run(
             [sys.executable, "-m", "secretguard", *args],
+            input=stdin_input,
             capture_output=True,
             text=True,
             cwd=cwd,
@@ -300,6 +301,30 @@ class CliTest(unittest.TestCase):
             # Runs automatically from config file, suppressed!
             result3 = self.run_cli(tmp, "scan", ".")
             self.assertEqual(result3.returncode, 0)
+
+    def test_scan_stdin_with_secret(self):
+        result = self.run_cli(None, "scan", "--stdin", stdin_input=f"TOKEN = '{SECRET}'")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("GitHub Token", result.stdout)
+        self.assertIn("stdin:1", result.stdout)
+
+    def test_scan_stdin_clean(self):
+        result = self.run_cli(None, "scan", "--stdin", stdin_input="print('hello')")
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("0 total", result.stdout)
+
+    def test_scan_stdin_custom_filename(self):
+        result = self.run_cli(None, "scan", "--stdin", "--filename", "custom_config.json", stdin_input=f"TOKEN = '{SECRET}'")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("custom_config.json:1", result.stdout)
+
+    def test_scan_stdin_json_output(self):
+        result = self.run_cli(None, "scan", "--stdin", "--json", stdin_input=f"TOKEN = '{SECRET}'")
+        self.assertEqual(result.returncode, 1)
+        data = json.loads(result.stdout)
+        self.assertGreaterEqual(len(data["findings"]), 1)
+        for finding in data["findings"]:
+            self.assertEqual(finding["path"], "stdin")
 
 
 if __name__ == "__main__":
