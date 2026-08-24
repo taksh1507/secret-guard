@@ -216,6 +216,7 @@ options:
   --only-rule RULE  Run only the given rule id (repeatable)
   --list-rules      List every available rule id and exit
   --baseline FILE   Suppress findings listed in a baseline file
+  --severity LEVEL  Minimum severity threshold to fail the scan (low, medium, high, critical) (default: low)
 ```
 
 ### Taming false positives
@@ -249,7 +250,8 @@ discovers `secret-guard.json` in the scanned directory or any parent:
   "no_entropy": false,
   "skip_rules": ["generic-secret-key"],
   "only_rules": [],
-  "baseline": []
+  "baseline": [],
+  "severity": "low"
 }
 ```
 
@@ -278,10 +280,35 @@ green while new leaks still fail. A baseline file is a JSON document:
 Scanned values are hashed client-side, so the baseline never needs to
 contain the secret itself.
 
-### Exit codes
+### Exit codes and Severity Thresholds
 
-- `0` — no secrets found, or `--help`/`--version`
-- `1` — at least one secret detected (or an error occurred)
+- `0` — no secrets found, or all found secrets are below the `--severity` threshold (or `--help`/`--version` was used)
+- `1` — at least one secret matching or exceeding the `--severity` threshold was detected (or a runtime error occurred)
+- `2` — CLI invocation error or configuration validation failure
+
+#### Severity Levels
+
+The scanner assigns a severity to every finding:
+- `critical`: Private cryptographic keys
+- `high`: Cloud API keys, SaaS tokens, OAuth tokens, and `.env` file credentials
+- `medium`: Variable assignments named like credentials or generic secret keys
+- `low`: High-entropy string detections
+
+By default, the severity threshold is `low`, meaning *any* finding fails the scan (exit code 1).
+
+To only fail the scan on high or critical findings (preventing low-entropy strings or credential variable assignments from breaking CI):
+
+```bash
+secret-guard scan . --severity high
+```
+
+Or set it in your `secret-guard.json` config:
+
+```json
+{
+  "severity": "high"
+}
+```
 
 Use this in CI — the job fails the moment a secret shows up:
 
