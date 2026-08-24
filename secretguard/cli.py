@@ -54,7 +54,13 @@ def find_config(start_path):
 
 CONFIG_FILENAME = "secret-guard.json"
 KNOWN_CONFIG_KEYS = {
-    "//", "exclude", "no_entropy", "skip_rules", "only_rules", "baseline",
+    "//",
+    "exclude",
+    "no_entropy",
+    "skip_rules",
+    "only_rules",
+    "baseline",
+    "severity",
 }
 
 
@@ -110,6 +116,16 @@ def load_config(config_path):
     _require_list_of(data, "skip_rules", str, "strings", config_path)
     _require_list_of(data, "only_rules", str, "strings", config_path)
     _require_list_of(data, "baseline", dict, "objects", config_path)
+    if "severity" in data and data["severity"] not in {
+        "low",
+        "medium",
+        "high",
+        "critical",
+    }:
+        _config_fatal(
+            f"Error: 'severity' in {config_path} must be one of: "
+            "low, medium, high, critical."
+        )
     return data
 
 
@@ -151,6 +167,12 @@ def build_parser():
     scan.add_argument(
         "--baseline", metavar="FILE",
         help="Path to a baseline file containing allowed/suppressed secrets.",
+    )
+    scan.add_argument(
+        "--severity",
+        choices=["low", "medium", "high", "critical"],
+        default=None,
+        help="Minimum severity threshold to fail the scan (default: low).",
     )
     scan.add_argument(
         "--skip-rule", action="append", default=[], metavar="RULE",
@@ -315,6 +337,18 @@ def _run_scan(args, exclude, skip_rules, only_rules, no_entropy):
         return _scan_staged(exclude, skip_rules, only_rules)
     return _scan_path(args, exclude, skip_rules, only_rules, no_entropy)
 
+def has_blocking_findings(findings, severity_threshold):
+    """Return True if any finding meets or exceeds the severity threshold."""
+
+    levels = {"low": 1, "medium": 2, "high": 3, "critical": 4}
+    threshold_val = levels.get(severity_threshold.lower(), 1)
+    for f in findings:
+        f_sev = f.get("severity", "medium").lower()
+        if levels.get(f_sev, 2) >= threshold_val:
+            return True
+    return False
+
+
 def cmd_scan(args):
     scan_path = "." if args.staged else args.path
     config_file = find_config(scan_path)
@@ -331,6 +365,9 @@ def cmd_scan(args):
         skip_rules = config.get("skip_rules", [])
         only_rules = config.get("only_rules", [])
     no_entropy = args.no_entropy or config.get("no_entropy", False)
+    severity_threshold = getattr(args, "severity", None) or config.get(
+        "severity", "low"
+    )
 
     unknown = unknown_rule_ids(skip_rules + only_rules)
     if unknown:
@@ -367,7 +404,7 @@ def cmd_scan(args):
                 findings, args.path, show_value=args.show_value, color=color
             )
         )
-    return 1 if findings else 0
+    return 1 if has_blocking_findings(findings, severity_threshold) else 0
 
 
 def cmd_init(args):

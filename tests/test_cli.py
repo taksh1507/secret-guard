@@ -301,6 +301,99 @@ class CliTest(unittest.TestCase):
             result3 = self.run_cli(tmp, "scan", ".")
             self.assertEqual(result3.returncode, 0)
 
+    def test_scan_severity_low(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "main.py").write_text(
+                "opaque = 'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2'",
+                encoding="utf-8",
+            )
+            result_default = self.run_cli(tmp, "scan", ".")
+            self.assertEqual(result_default.returncode, 1)
+
+            result_low = self.run_cli(tmp, "scan", "--severity", "low", ".")
+            self.assertEqual(result_low.returncode, 1)
+
+            result_med = self.run_cli(tmp, "scan", "--severity", "medium", ".")
+            self.assertEqual(result_med.returncode, 0)
+            self.assertIn("High Entropy String", result_med.stdout)
+
+            result_high = self.run_cli(tmp, "scan", "--severity", "high", ".")
+            self.assertEqual(result_high.returncode, 0)
+
+            result_crit = self.run_cli(tmp, "scan", "--severity", "critical", ".")
+            self.assertEqual(result_crit.returncode, 0)
+
+    def test_scan_severity_medium(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "main.py").write_text(
+                "password = 'somepassword'", encoding="utf-8"
+            )
+            result_med = self.run_cli(tmp, "scan", "--severity", "medium", ".")
+            self.assertEqual(result_med.returncode, 1)
+
+            result_low = self.run_cli(tmp, "scan", "--severity", "low", ".")
+            self.assertEqual(result_low.returncode, 1)
+
+            result_high = self.run_cli(tmp, "scan", "--severity", "high", ".")
+            self.assertEqual(result_high.returncode, 0)
+            self.assertIn("Credential Assignment", result_high.stdout)
+
+            result_crit = self.run_cli(tmp, "scan", "--severity", "critical", ".")
+            self.assertEqual(result_crit.returncode, 0)
+
+    def test_scan_severity_high(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "main.py").write_text(
+                f"TOKEN = '{SECRET}'", encoding="utf-8"
+            )
+            result_high = self.run_cli(tmp, "scan", "--severity", "high", ".")
+            self.assertEqual(result_high.returncode, 1)
+
+            result_med = self.run_cli(tmp, "scan", "--severity", "medium", ".")
+            self.assertEqual(result_med.returncode, 1)
+
+            result_crit = self.run_cli(tmp, "scan", "--severity", "critical", ".")
+            self.assertEqual(result_crit.returncode, 0)
+            self.assertIn("GitHub Token", result_crit.stdout)
+
+    def test_scan_severity_critical(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "main.py").write_text(
+                "-----BEGIN PRIVATE KEY-----", encoding="utf-8"
+            )
+            result_crit = self.run_cli(tmp, "scan", "--severity", "critical", ".")
+            self.assertEqual(result_crit.returncode, 1)
+
+            result_high = self.run_cli(tmp, "scan", "--severity", "high", ".")
+            self.assertEqual(result_high.returncode, 1)
+
+    def test_scan_severity_config_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "main.py").write_text(
+                "password = 'somepassword'", encoding="utf-8"
+            )
+            config_file = Path(tmp, "secret-guard.json")
+            config_content = {"severity": "high"}
+            config_file.write_text(json.dumps(config_content), encoding="utf-8")
+
+            result_config = self.run_cli(tmp, "scan", ".")
+            self.assertEqual(result_config.returncode, 0)
+
+            result_override = self.run_cli(
+                tmp, "scan", "--severity", "medium", "."
+            )
+            self.assertEqual(result_override.returncode, 1)
+
+    def test_scan_severity_config_validation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config_file = Path(tmp, "secret-guard.json")
+            config_content = {"severity": "invalid-severity"}
+            config_file.write_text(json.dumps(config_content), encoding="utf-8")
+
+            result = self.run_cli(tmp, "scan", ".")
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("Error: 'severity' in", result.stderr)
+
     def test_stdin_scan_detects_secret(self):
         result = subprocess.run(
                 [sys.executable, "-m", "secretguard", "scan", "--stdin"],
