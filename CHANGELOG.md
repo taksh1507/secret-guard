@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.5.0](https://github.com/taksh1507/secret-guard/compare/v0.4.0...v0.5.0) (2026-08-24)
+
+
+### Features
+
+* **cli:** add --severity flag to fail scans only past a severity threshold ([0a6d569](https://github.com/taksh1507/secret-guard/commit/0a6d56919526cfa647b8d3de1cde1e6ca835c26a))
+* **cli:** add --severity flag to fail scans only past a severity threshold ([#67](https://github.com/taksh1507/secret-guard/issues/67)) ([0a6d569](https://github.com/taksh1507/secret-guard/commit/0a6d56919526cfa647b8d3de1cde1e6ca835c26a))
+* **cli:** add --severity threshold support to scan command ([db4fb8a](https://github.com/taksh1507/secret-guard/commit/db4fb8a8a3e33391490eb0205b85a579cab99ff3))
+* **cli:** add --stdin and --filename to scan piped input ([#65](https://github.com/taksh1507/secret-guard/issues/65)) ([08c34aa](https://github.com/taksh1507/secret-guard/commit/08c34aa9711f8262a84ea52c7d6e36b6f13a3019))
+
 ## [0.4.0](https://github.com/taksh1507/secret-guard/compare/v0.3.1...v0.4.0) (2026-08-20)
 
 
