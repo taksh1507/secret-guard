@@ -164,6 +164,14 @@ def build_parser():
         "--list-rules", action="store_true",
         help="List every available rule id and exit.",
     )
+    scan.add_argument(
+        "--stdin", action="store_true",
+        help="Read content to scan from stdin instead of a path on disk.",
+    )
+    scan.add_argument(
+        "--filename", default="stdin", metavar="NAME",
+        help="Reported path for --stdin input (default: stdin).",
+    )
     scan.set_defaults(func=cmd_scan)
 
     hooks = subparsers.add_parser(
@@ -266,6 +274,46 @@ def resolve_baseline(args, config):
             sys.exit(2)
     return config.get("baseline", [])
 
+def _scan_stdin(args, exclude, skip_rules, only_rules, no_entropy):
+    scanner = Scanner(
+        ".", excludes=exclude, skip_rules=skip_rules, only_rules=only_rules
+    )
+    scanner.include_entropy = not no_entropy
+    text = sys.stdin.read()
+    return scanner.scan_text(args.filename, text)
+
+
+def _scan_staged(exclude, skip_rules, only_rules):
+    files = staged_files()
+    scanner = Scanner(
+        ".", excludes=exclude, skip_rules=skip_rules, only_rules=only_rules
+    )
+    findings = []
+    for rel in files:
+        candidate = os.path.relpath(rel, scanner.root).replace(os.sep, "/")
+        if scanner._is_binary(candidate) or scanner._is_ignored(candidate):
+            continue
+        text = staged_content(rel)
+        if text is None:
+            continue
+        findings.extend(scanner.scan_text(rel, text))
+    return findings
+
+
+def _scan_path(args, exclude, skip_rules, only_rules, no_entropy):
+    scanner = Scanner(
+        args.path, excludes=exclude, skip_rules=skip_rules, only_rules=only_rules
+    )
+    scanner.include_entropy = not no_entropy
+    return scanner.scan()
+
+
+def _run_scan(args, exclude, skip_rules, only_rules, no_entropy):
+    if args.stdin:
+        return _scan_stdin(args, exclude, skip_rules, only_rules, no_entropy)
+    if args.staged:
+        return _scan_staged(exclude, skip_rules, only_rules)
+    return _scan_path(args, exclude, skip_rules, only_rules, no_entropy)
 
 def cmd_scan(args):
     scan_path = "." if args.staged else args.path
@@ -302,32 +350,7 @@ def cmd_scan(args):
 
     baseline = resolve_baseline(args, config)
 
-    if args.staged:
-        files = staged_files()
-        scanner = Scanner(
-            ".",
-            excludes=exclude,
-            skip_rules=skip_rules,
-            only_rules=only_rules,
-        )
-        findings = []
-        for rel in files:
-            candidate = os.path.relpath(rel, scanner.root).replace(os.sep, "/")
-            if scanner._is_binary(candidate) or scanner._is_ignored(candidate):
-                continue
-            text = staged_content(rel)
-            if text is None:
-                continue
-            findings.extend(scanner.scan_text(rel, text))
-    else:
-        scanner = Scanner(
-            args.path,
-            excludes=exclude,
-            skip_rules=skip_rules,
-            only_rules=only_rules,
-        )
-        scanner.include_entropy = not no_entropy
-        findings = scanner.scan()
+    findings = _run_scan(args, exclude, skip_rules, only_rules, no_entropy)
 
     findings = filter_baseline(findings, baseline)
 
