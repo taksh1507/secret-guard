@@ -11,8 +11,8 @@ from . import __version__
 from .reporter import format_console, format_json
 from .rules import (
     RULES,
-    RuleManifestError,
     SPECIAL_RULES,
+    RuleManifestError,
     compile_custom_rules,
     known_rule_ids,
     load_rules_file,
