@@ -1,5 +1,6 @@
 """Detection rules: regex patterns and entropy heuristics."""
 
+import json
 import math
 import re
 
@@ -218,35 +219,158 @@ def entropy_candidates(text):
             yield match.start(), match.end(), entropy, value
 
 
-def known_rule_ids():
+def known_rule_ids(custom_rules=None):
     """Return every rule id the scanner can run in a scan."""
 
-    return [rule["id"] for rule in RULES] + list(SPECIAL_RULE_IDS)
+    ids = [rule["id"] for rule in RULES] + list(SPECIAL_RULE_IDS)
+    ids += [rule["id"] for rule in custom_rules or ()]
+    return ids
 
 
-def unknown_rule_ids(rule_ids):
+def unknown_rule_ids(rule_ids, custom_rules=None):
     """Return the rule ids supplied on the CLI that do not exist."""
 
-    known = set(known_rule_ids())
+    known = set(known_rule_ids(custom_rules))
     return sorted({rule_id for rule_id in rule_ids if rule_id not in known})
 
 
-def matches_rules(text, skip_rules=None, only_rules=None):
+VALID_SEVERITIES = ("low", "medium", "high", "critical")
+
+
+class RuleManifestError(ValueError):
+    """Raised when a custom rule manifest is invalid.
+
+    Carries an actionable, human-readable message so callers can surface it
+    and fail the scan instead of silently ignoring a broken manifest.
+    """
+
+
+def compile_custom_rules(raw_rules, source="custom rules", seen=None):
+    """Validate user-defined rules and compile them into built-in-shaped dicts.
+
+    ``raw_rules`` is a list of dicts with keys ``name`` and ``pattern`` (plus
+    optional ``severity`` and ``description``). ``source`` names the manifest
+    in error messages. ``seen`` maps already-claimed rule ids to a human
+    label; it is seeded with the built-in ids when omitted and updated in
+    place, so a caller can compile several manifests and still catch
+    cross-manifest duplicates. Raises ``RuleManifestError`` on the first
+    problem found.
+    """
+
+    if seen is None:
+        seen = {rid: "a built-in rule" for rid in known_rule_ids()}
+    if not isinstance(raw_rules, list):
+        raise RuleManifestError(f"'rules' in {source} must be a list.")
+
+    compiled = []
+    for index, item in enumerate(raw_rules, 1):
+        where = f"{source} (rule #{index})"
+        if not isinstance(item, dict):
+            raise RuleManifestError(f"{where} must be a JSON object.")
+
+        name = item.get("name")
+        if not isinstance(name, str) or not name.strip():
+            raise RuleManifestError(f"{where} is missing a non-empty 'name'.")
+        name = name.strip()
+
+        pattern = item.get("pattern")
+        if not isinstance(pattern, str) or not pattern:
+            raise RuleManifestError(
+                f"rule '{name}' in {source} is missing a non-empty 'pattern'."
+            )
+
+        severity = item.get("severity", "medium")
+        if severity not in VALID_SEVERITIES:
+            raise RuleManifestError(
+                f"rule '{name}' in {source} has invalid severity "
+                f"{severity!r}; expected one of {', '.join(VALID_SEVERITIES)}."
+            )
+
+        description = item.get("description", "")
+        if not isinstance(description, str):
+            raise RuleManifestError(
+                f"rule '{name}' in {source} has a non-string 'description'."
+            )
+
+        rule_id = _slugify(name)
+        if not rule_id:
+            raise RuleManifestError(
+                f"rule name '{name}' in {source} does not yield a valid id."
+            )
+        if rule_id in seen:
+            raise RuleManifestError(
+                f"duplicate rule id '{rule_id}' from '{name}' in {source} "
+                f"conflicts with {seen[rule_id]}."
+            )
+
+        try:
+            compiled_pattern = re.compile(pattern, re.MULTILINE | re.IGNORECASE)
+        except re.error as exc:
+            raise RuleManifestError(
+                f"rule '{name}' in {source} has an invalid regex: {exc}."
+            ) from exc
+
+        seen[rule_id] = f"rule '{name}'"
+        compiled.append(
+            {
+                "id": rule_id,
+                "name": name,
+                "pattern": compiled_pattern,
+                "severity": severity,
+                "description": description,
+                "custom": True,
+            }
+        )
+    return compiled
+
+
+def load_rules_file(path, seen=None):
+    """Read a JSON rule manifest from ``path`` and return compiled rules.
+
+    The manifest is a JSON object with a top-level ``rules`` array. Any read,
+    parse, or schema problem is raised as ``RuleManifestError`` so the CLI can
+    fail the scan with an actionable message.
+    """
+
+    try:
+        with open(path, encoding="utf-8") as handle:
+            data = json.load(handle)
+    except FileNotFoundError as exc:
+        raise RuleManifestError(f"rules file not found: {path}") from exc
+    except OSError as exc:
+        raise RuleManifestError(
+            f"could not read rules file {path}: {exc}"
+        ) from exc
+    except json.JSONDecodeError as exc:
+        raise RuleManifestError(
+            f"could not parse rules file {path}: {exc}"
+        ) from exc
+
+    if not isinstance(data, dict) or "rules" not in data:
+        raise RuleManifestError(
+            f"rules file {path} must be a JSON object with a 'rules' array."
+        )
+    return compile_custom_rules(data["rules"], source=path, seen=seen)
+
+
+def matches_rules(text, skip_rules=None, only_rules=None, rules=None):
     """Run regex rules against text, honoring rule-id filters.
 
     Only runs the intersection of `only_rules` (when given) with everything
-    except `skip_rules`. Yields findings as (rule, match).
+    except `skip_rules`. `rules` defaults to the built-in RULES; callers pass
+    built-ins plus custom rules to include them. Yields (rule, match).
     """
 
+    rules = RULES if rules is None else rules
     skips = set(skip_rules or ())
     if only_rules:
         enabled = [
             rule
-            for rule in RULES
+            for rule in rules
             if rule["id"] in only_rules and rule["id"] not in skips
         ]
     else:
-        enabled = [rule for rule in RULES if rule["id"] not in skips]
+        enabled = [rule for rule in rules if rule["id"] not in skips]
     for rule in enabled:
         for match in rule["pattern"].finditer(text):
             yield rule, match

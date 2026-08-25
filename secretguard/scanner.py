@@ -13,6 +13,7 @@ except ImportError:  # pragma: no cover - optional dependency
 from .rules import (
     DOTENV_RULE_ID,
     ENTROPY_RULE_ID,
+    RULES,
     dotenv_secret_assignments,
     entropy_candidates,
     is_dotenv_path,
@@ -43,12 +44,14 @@ class Scanner:
         include_entropy=True,
         skip_rules=None,
         only_rules=None,
+        custom_rules=None,
     ):
         self.root = os.path.abspath(root)
         self.extra_excludes = set(excludes or [])
         self.include_entropy = include_entropy
         self.skip_rules = set(skip_rules or [])
         self.only_rules = set(only_rules or []) or None
+        self.custom_rules = list(custom_rules or [])
         self._spec = None
         self._load_gitignore()
 
@@ -152,7 +155,8 @@ class Scanner:
 
         skip_rules = sorted(self.skip_rules)
         only_rules = sorted(self.only_rules) if self.only_rules else None
-        for rule, match in matches_rules(text, skip_rules, only_rules):
+        rules = RULES + self.custom_rules
+        for rule, match in matches_rules(text, skip_rules, only_rules, rules):
             line = line_number(text, match.start())
             if line in key_lines:
                 continue

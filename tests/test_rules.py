@@ -1,11 +1,18 @@
 """Unit tests for detection rules and entropy heuristics."""
 
+import os
+import shutil
+import tempfile
 import unittest
 
 from secretguard.rules import (
+    RULES,
+    RuleManifestError,
+    compile_custom_rules,
     dotenv_secret_assignments,
     entropy_candidates,
     is_dotenv_path,
+    load_rules_file,
     matches_rules,
     shannon_entropy,
 )
@@ -352,6 +359,102 @@ class DotenvValueParsingTest(unittest.TestCase):
         # this way; parsing logic itself doesn't care about the filename.
         self.assertFalse(is_dotenv_path("config.py"))
 
+
+class CustomRuleCompileTest(unittest.TestCase):
+    def _compile_one(self, **overrides):
+        rule = {
+            "name": "My API Token",
+            "pattern": "mytok_[A-Za-z0-9]{20,}",
+            "severity": "high",
+            "description": "Acme platform token",
+        }
+        rule.update(overrides)
+        return compile_custom_rules([rule])
+
+    def test_happy_path_compiles_rule(self):
+        rules = self._compile_one()
+        self.assertEqual(len(rules), 1)
+        self.assertEqual(rules[0]["id"], "my-api-token")
+        self.assertEqual(rules[0]["severity"], "high")
+        self.assertEqual(rules[0]["description"], "Acme platform token")
+        self.assertTrue(rules[0]["custom"])
+
+    def test_compiled_rule_detects_via_matches_rules(self):
+        rules = self._compile_one()
+        names = [
+            rule["name"]
+            for rule, _ in matches_rules(
+                "k = mytok_abcdefghij0123456789", rules=RULES + rules
+            )
+        ]
+        self.assertIn("My API Token", names)
+
+    def test_severity_defaults_to_medium(self):
+        rules = compile_custom_rules([{"name": "X", "pattern": "abc"}])
+        self.assertEqual(rules[0]["severity"], "medium")
+
+    def test_invalid_regex_raises(self):
+        with self.assertRaises(RuleManifestError):
+            compile_custom_rules([{"name": "Bad", "pattern": "([A-Z"}])
+
+    def test_unknown_severity_raises(self):
+        with self.assertRaises(RuleManifestError):
+            self._compile_one(severity="urgent")
+
+    def test_duplicate_name_raises(self):
+        with self.assertRaises(RuleManifestError):
+            compile_custom_rules(
+                [{"name": "Dup", "pattern": "a"}, {"name": "Dup", "pattern": "b"}]
+            )
+
+    def test_collision_with_builtin_id_raises(self):
+        with self.assertRaises(RuleManifestError):
+            compile_custom_rules([{"name": "GitHub Token", "pattern": "a"}])
+
+    def test_missing_pattern_raises(self):
+        with self.assertRaises(RuleManifestError):
+            compile_custom_rules([{"name": "NoPattern"}])
+
+    def test_missing_name_raises(self):
+        with self.assertRaises(RuleManifestError):
+            compile_custom_rules([{"pattern": "abc"}])
+
+    def test_rules_must_be_a_list(self):
+        with self.assertRaises(RuleManifestError):
+            compile_custom_rules({"name": "X", "pattern": "abc"})
+
+
+class LoadRulesFileTest(unittest.TestCase):
+    def setUp(self):
+        self._tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self._tmp, True)
+
+    def _write(self, content):
+        path = os.path.join(self._tmp, "rules.json")
+        with open(path, "w", encoding="utf-8") as handle:
+            handle.write(content)
+        return path
+
+    def test_loads_valid_manifest(self):
+        path = self._write(
+            '{"rules": [{"name": "Tok", "pattern": "tok_[0-9]{4}"}]}'
+        )
+        rules = load_rules_file(path)
+        self.assertEqual(rules[0]["id"], "tok")
+
+    def test_missing_file_raises(self):
+        with self.assertRaises(RuleManifestError):
+            load_rules_file(os.path.join(self._tmp, "nope.json"))
+
+    def test_malformed_json_raises(self):
+        path = self._write('{"rules": [')
+        with self.assertRaises(RuleManifestError):
+            load_rules_file(path)
+
+    def test_missing_rules_key_raises(self):
+        path = self._write('{"other": []}')
+        with self.assertRaises(RuleManifestError):
+            load_rules_file(path)
 
 
 if __name__ == "__main__":
