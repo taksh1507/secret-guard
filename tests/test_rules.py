@@ -108,8 +108,7 @@ class RuleDetectionTest(unittest.TestCase):
         self.assertIn(
             "Discord Bot Token",
             rule_names(
-                "token = 123456789012345678901234."
-                "123456.123456789012345678901234567890"
+                "token = 123456789012345678901234.123456.123456789012345678901234567890"
             ),
         )
 
@@ -159,6 +158,35 @@ class RuleDetectionTest(unittest.TestCase):
         self.assertIn(
             "HubSpot Access Token",
             rule_names("token = pat-eu1-" + "a" * 32),
+        )
+
+    def test_gitlab_personal_access_token(self):
+        self.assertIn(
+            "GitLab Personal Access Token",
+            rule_names("token = glpat-1234567890abcdefghij"),
+        )
+        self.assertIn(
+            "GitLab Personal Access Token",
+            rule_names("token = glpat-abc-1234567890_defgh"),
+        )
+
+    def test_huggingface_token(self):
+        self.assertIn(
+            "Hugging Face Token",
+            rule_names("token = hf_1234567890abcdefghijklmnopqrstuvwx"),
+        )
+
+    def test_slack_incoming_webhook(self):
+        # Construct the URL dynamically to avoid triggering GitHub push protection
+        webhook_url = (
+            "https://hooks.slack.com/services/"
+            + "T01234567/"
+            + "B01234567/"
+            + "123456789012345678901234"
+        )
+        self.assertIn(
+            "Slack Incoming Webhook",
+            rule_names(f"webhook = {webhook_url}"),
         )
 
     def test_generic_secret_key(self):
@@ -223,9 +251,7 @@ class EntropyCandidateTest(unittest.TestCase):
 
     def test_high_entropy_string_detected(self):
         values = candidate_values("secret = 0123456789abcdef0123456789abcdef")
-        self.assertTrue(
-            any(len(v) >= self._MIN_HIGH_ENTROPY_LEN for v in values)
-        )
+        self.assertTrue(any(len(v) >= self._MIN_HIGH_ENTROPY_LEN for v in values))
 
     def test_short_string_skipped(self):
         self.assertEqual(candidate_values("abc123"), [])
@@ -236,11 +262,7 @@ class EntropyCandidateTest(unittest.TestCase):
 
 class DotenvKeyTest(unittest.TestCase):
     def test_flags_secret_key_names(self):
-        text = (
-            "GITHUB_TOKEN=ghp_abc\n"
-            "AWS_SECRET_ACCESS_KEY=xyz\n"
-            "PORT=8080\n"
-        )
+        text = "GITHUB_TOKEN=ghp_abc\nAWS_SECRET_ACCESS_KEY=xyz\nPORT=8080\n"
         keys = [key for _line, key, _value in dotenv_secret_assignments(text)]
         self.assertIn("GITHUB_TOKEN", keys)
         self.assertIn("AWS_SECRET_ACCESS_KEY", keys)
@@ -284,6 +306,7 @@ class DotenvKeyTest(unittest.TestCase):
             self.assertFalse(
                 is_dotenv_path(path), f"{path!r} should not be treated as a dotenv file"
             )
+
 
 class DotenvValueParsingTest(unittest.TestCase):
     def test_export_prefix_is_detected(self):
@@ -330,7 +353,7 @@ class DotenvValueParsingTest(unittest.TestCase):
         text = "DB_TOKEN=abc=def\n"
         items = list(dotenv_secret_assignments(text))
         self.assertEqual(items[0][2], "abc=def")
-        
+
     def test_interpolated_variable_is_detected_and_not_resolved(self):
         text = "API_KEY=${OTHER_SECRET}\n"
         items = list(dotenv_secret_assignments(text))
@@ -351,7 +374,6 @@ class DotenvValueParsingTest(unittest.TestCase):
         # Sanity check: is_dotenv_path still gates which files get parsed
         # this way; parsing logic itself doesn't care about the filename.
         self.assertFalse(is_dotenv_path("config.py"))
-
 
 
 if __name__ == "__main__":
