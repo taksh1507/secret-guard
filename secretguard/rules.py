@@ -149,6 +149,24 @@ RULES = [
         description="HubSpot Private App Access Token.",
     ),
     _r(
+        r"glpat-[0-9a-z_-]{20,}",
+        "GitLab Personal Access Token",
+        severity="high",
+        description="GitLab Personal Access Token.",
+    ),
+    _r(
+        r"hf_[a-z0-9]{34}",
+        "Hugging Face Token",
+        severity="high",
+        description="Hugging Face User Access Token.",
+    ),
+    _r(
+        r"https://hooks\.slack\.com/services/T[a-z0-9_]{8,11}/B[a-z0-9_]{8,11}/[a-z0-9_]{24}",
+        "Slack Incoming Webhook",
+        severity="high",
+        description="Slack Incoming Webhook URL.",
+    ),
+    _r(
         r"sk-[0-9a-fA-F]{32,}",
         "Generic Secret Key",
         severity="medium",
@@ -183,9 +201,7 @@ RULES = [
 
 # Charsets used for entropy scoring.
 HEX_CHARS = set("0123456789abcdefABCDEF")
-BASE64_CHARS = set(
-    "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-_"
-)
+BASE64_CHARS = set("0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-_")
 
 ALPHANUMERIC = re.compile(r"[A-Za-z0-9_-]{12,}")
 
