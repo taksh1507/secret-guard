@@ -12,6 +12,19 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SECRET = "ghp_1234567890abcdefghijklmnopqrstuvwxyz"
+CUSTOM_SECRET = "acme_tok_0123456789abcdef0123"
+CUSTOM_MANIFEST = json.dumps(
+    {
+        "rules": [
+            {
+                "name": "Acme Token",
+                "pattern": "acme_tok_[a-f0-9]{20,}",
+                "severity": "high",
+                "description": "Acme platform API token.",
+            }
+        ]
+    }
+)
 
 
 def run_git(repo, *args):
@@ -461,6 +474,139 @@ class CliTest(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertNotIn(SECRET, result.stdout)
         self.assertIsNotNone(json.loads(result.stdout))
+
+
+class CustomRuleCliTest(unittest.TestCase):
+    def run_cli(self, cwd, *args):
+        env = os.environ.copy()
+        env["PYTHONPATH"] = str(PROJECT_ROOT)
+        return subprocess.run(
+            [sys.executable, "-m", "secretguard", *args],
+            capture_output=True,
+            text=True,
+            cwd=cwd,
+            env=env,
+            check=False,
+        )
+
+    def test_rules_path_relative_detects_custom_secret(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "rules.json").write_text(CUSTOM_MANIFEST, encoding="utf-8")
+            Path(tmp, "app.py").write_text(
+                f"api = '{CUSTOM_SECRET}'", encoding="utf-8"
+            )
+            result = self.run_cli(
+                tmp, "scan", "--rules-path", "rules.json", "."
+            )
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("Acme Token", result.stdout)
+
+    def test_config_embedded_rules_are_discovered(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "secret-guard.json").write_text(
+                CUSTOM_MANIFEST, encoding="utf-8"
+            )
+            Path(tmp, "app.py").write_text(
+                f"api = '{CUSTOM_SECRET}'", encoding="utf-8"
+            )
+            result = self.run_cli(tmp, "scan", ".")
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("Acme Token", result.stdout)
+
+    def test_custom_value_masked_by_default(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "rules.json").write_text(CUSTOM_MANIFEST, encoding="utf-8")
+            Path(tmp, "app.py").write_text(
+                f"api = '{CUSTOM_SECRET}'", encoding="utf-8"
+            )
+            result = self.run_cli(
+                tmp, "scan", "--json", "--rules-path", "rules.json", "."
+            )
+            self.assertEqual(result.returncode, 1)
+            self.assertNotIn(CUSTOM_SECRET, result.stdout)
+
+    def test_custom_value_revealed_with_show_value(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "rules.json").write_text(CUSTOM_MANIFEST, encoding="utf-8")
+            Path(tmp, "app.py").write_text(
+                f"api = '{CUSTOM_SECRET}'", encoding="utf-8"
+            )
+            result = self.run_cli(
+                tmp, "scan", "--json", "--show-value",
+                "--rules-path", "rules.json", ".",
+            )
+            self.assertEqual(result.returncode, 1)
+            self.assertIn(CUSTOM_SECRET, result.stdout)
+
+    def test_list_rules_includes_custom(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "rules.json").write_text(CUSTOM_MANIFEST, encoding="utf-8")
+            result = self.run_cli(
+                tmp, "scan", "--rules-path", "rules.json", "--list-rules"
+            )
+            self.assertEqual(result.returncode, 0)
+            self.assertIn("Custom rules:", result.stdout)
+            self.assertIn("acme-token", result.stdout)
+
+    def test_invalid_regex_fails_scan(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "rules.json").write_text(
+                '{"rules": [{"name": "Bad", "pattern": "([A-Z"}]}',
+                encoding="utf-8",
+            )
+            Path(tmp, "app.py").write_text("x = 1\n", encoding="utf-8")
+            result = self.run_cli(
+                tmp, "scan", "--rules-path", "rules.json", "."
+            )
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("invalid regex", result.stderr)
+
+    def test_unknown_severity_fails_scan(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "rules.json").write_text(
+                '{"rules": [{"name": "X", "pattern": "abc", '
+                '"severity": "urgent"}]}',
+                encoding="utf-8",
+            )
+            Path(tmp, "app.py").write_text("x = 1\n", encoding="utf-8")
+            result = self.run_cli(
+                tmp, "scan", "--rules-path", "rules.json", "."
+            )
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("invalid severity", result.stderr)
+
+    def test_duplicate_name_fails_scan(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "rules.json").write_text(
+                '{"rules": [{"name": "Dup", "pattern": "a"}, '
+                '{"name": "Dup", "pattern": "b"}]}',
+                encoding="utf-8",
+            )
+            Path(tmp, "app.py").write_text("x = 1\n", encoding="utf-8")
+            result = self.run_cli(
+                tmp, "scan", "--rules-path", "rules.json", "."
+            )
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("duplicate rule id", result.stderr)
+
+    def test_missing_rules_file_fails_scan(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "app.py").write_text("x = 1\n", encoding="utf-8")
+            result = self.run_cli(
+                tmp, "scan", "--rules-path", "nope.json", "."
+            )
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("not found", result.stderr)
+
+    def test_init_scaffolds_rules_key(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            result = self.run_cli(tmp, "init")
+            self.assertEqual(result.returncode, 0)
+            data = json.loads(
+                Path(tmp, "secret-guard.json").read_text(encoding="utf-8")
+            )
+            self.assertIn("rules", data)
+            self.assertEqual(data["rules"], [])
 
 
 if __name__ == "__main__":

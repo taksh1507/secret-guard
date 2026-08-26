@@ -214,6 +214,7 @@ options:
   --staged          Scan only files staged in git
   --skip-rule RULE  Never run the given rule id (repeatable)
   --only-rule RULE  Run only the given rule id (repeatable)
+  --rules-path FILE Add custom rules from a JSON manifest
   --list-rules      List every available rule id and exit
   --baseline FILE   Suppress findings listed in a baseline file
   --severity LEVEL  Minimum severity threshold to fail the scan (low, medium, high, critical) (default: low)
@@ -250,6 +251,7 @@ discovers `secret-guard.json` in the scanned directory or any parent:
   "no_entropy": false,
   "skip_rules": ["generic-secret-key"],
   "only_rules": [],
+  "rules": [],
   "baseline": [],
   "severity": "low"
 }
@@ -260,6 +262,49 @@ Command-line flags override config values. Scaffold a starter file with:
 ```bash
 secret-guard init
 ```
+
+### Custom rule manifests
+
+Teams can register their own regex detections without forking. A manifest
+is a JSON object with a `rules` array; each rule needs a `name` and a
+`pattern`, plus optional `severity` (`low`/`medium`/`high`/`critical`,
+default `medium`) and `description`:
+
+```json
+{
+  "rules": [
+    {
+      "name": "Acme API Token",
+      "pattern": "acme_tok_[a-f0-9]{20,}",
+      "severity": "high",
+      "description": "Acme platform API token."
+    }
+  ]
+}
+```
+
+Point a scan at a manifest with `--rules-path`, or commit the rules under
+the `rules` key of `secret-guard.json` (discovered automatically, so it
+works from a gitignored default location too):
+
+```bash
+# From a standalone manifest anywhere on disk
+secret-guard scan . --rules-path .secret-guard/rules.json
+
+# Custom + built-in rules both listed
+secret-guard scan --rules-path .secret-guard/rules.json --list-rules
+```
+
+Custom rules flow through the exact same pipeline as the built-ins: they
+respect `--skip-rule`/`--only-rule` (by their slugified id, e.g.
+`acme-api-token`), honor severity thresholds, and mask matched values by
+default (use `--show-value` to reveal them). A ready-to-copy manifest lives
+in [`examples/rules.json`](examples/rules.json).
+
+Manifests fail fast rather than silently: a duplicate rule name, an
+unreadable regex, an invalid severity, or a missing/malformed file exits
+with code `2` and an actionable message, so a broken manifest can never
+quietly disable detection.
 
 ### Baselines / allowlist
 
@@ -364,7 +409,7 @@ issues per our [Security Policy](SECURITY.md).
 - [ ] Git history scanning
 - [ ] Baseline / allowlist support
 - [ ] SARIF output for GitHub code scanning
-- [ ] Custom rule manifests
+- [x] Custom rule manifests
 
 ## License
 
