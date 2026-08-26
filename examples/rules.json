@@ -1,0 +1,21 @@
+{
+  "rules": [
+    {
+      "name": "Acme API Token",
+      "pattern": "acme_tok_[a-f0-9]{20,}",
+      "severity": "high",
+      "description": "Acme platform API token."
+    },
+    {
+      "name": "Internal Service Key",
+      "pattern": "svc-[A-Z0-9]{8}-[A-Za-z0-9]{32}",
+      "severity": "critical",
+      "description": "Internal service-to-service signing key."
+    },
+    {
+      "name": "Legacy Session Secret",
+      "pattern": "sess_[A-Za-z0-9]{40}",
+      "description": "Legacy web session secret (defaults to medium severity)."
+    }
+  ]
+}

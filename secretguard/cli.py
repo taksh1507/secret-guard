@@ -9,7 +9,15 @@ import sys
 
 from . import __version__
 from .reporter import format_console, format_json
-from .rules import RULES, SPECIAL_RULES, unknown_rule_ids
+from .rules import (
+    RULES,
+    SPECIAL_RULES,
+    RuleManifestError,
+    compile_custom_rules,
+    known_rule_ids,
+    load_rules_file,
+    unknown_rule_ids,
+)
 from .scanner import Scanner
 
 
@@ -59,6 +67,7 @@ KNOWN_CONFIG_KEYS = {
     "no_entropy",
     "skip_rules",
     "only_rules",
+    "rules",
     "baseline",
     "severity",
 }
@@ -183,6 +192,10 @@ def build_parser():
         help="Run only the given rule id (repeatable).",
     )
     scan.add_argument(
+        "--rules-path", metavar="FILE",
+        help="Path to a JSON manifest of custom rules to add to the built-ins.",
+    )
+    scan.add_argument(
         "--list-rules", action="store_true",
         help="List every available rule id and exit.",
     )
@@ -242,7 +255,7 @@ def staged_content(path):
         return None
 
 
-def list_rules():
+def list_rules(custom_rules=None):
     """Print every available rule id with name, severity, and description."""
 
     def fmt(info):
@@ -253,6 +266,10 @@ def list_rules():
     print("Regex rules:")
     for rule in RULES:
         print(fmt(rule))
+    if custom_rules:
+        print("\nCustom rules:")
+        for rule in custom_rules:
+            print(fmt(rule))
     print("\nSpecial rules:")
     for info in SPECIAL_RULES.values():
         print(fmt(info))
@@ -296,19 +313,21 @@ def resolve_baseline(args, config):
             sys.exit(2)
     return config.get("baseline", [])
 
-def _scan_stdin(args, exclude, skip_rules, only_rules, no_entropy):
+def _scan_stdin(args, exclude, skip_rules, only_rules, no_entropy, custom_rules):
     scanner = Scanner(
-        ".", excludes=exclude, skip_rules=skip_rules, only_rules=only_rules
+        ".", excludes=exclude, skip_rules=skip_rules, only_rules=only_rules,
+        custom_rules=custom_rules,
     )
     scanner.include_entropy = not no_entropy
     text = sys.stdin.read()
     return scanner.scan_text(args.filename, text)
 
 
-def _scan_staged(exclude, skip_rules, only_rules):
+def _scan_staged(exclude, skip_rules, only_rules, custom_rules):
     files = staged_files()
     scanner = Scanner(
-        ".", excludes=exclude, skip_rules=skip_rules, only_rules=only_rules
+        ".", excludes=exclude, skip_rules=skip_rules, only_rules=only_rules,
+        custom_rules=custom_rules,
     )
     findings = []
     for rel in files:
@@ -322,20 +341,25 @@ def _scan_staged(exclude, skip_rules, only_rules):
     return findings
 
 
-def _scan_path(args, exclude, skip_rules, only_rules, no_entropy):
+def _scan_path(args, exclude, skip_rules, only_rules, no_entropy, custom_rules):
     scanner = Scanner(
-        args.path, excludes=exclude, skip_rules=skip_rules, only_rules=only_rules
+        args.path, excludes=exclude, skip_rules=skip_rules, only_rules=only_rules,
+        custom_rules=custom_rules,
     )
     scanner.include_entropy = not no_entropy
     return scanner.scan()
 
 
-def _run_scan(args, exclude, skip_rules, only_rules, no_entropy):
+def _run_scan(args, exclude, skip_rules, only_rules, no_entropy, custom_rules):
     if args.stdin:
-        return _scan_stdin(args, exclude, skip_rules, only_rules, no_entropy)
+        return _scan_stdin(
+            args, exclude, skip_rules, only_rules, no_entropy, custom_rules
+        )
     if args.staged:
-        return _scan_staged(exclude, skip_rules, only_rules)
-    return _scan_path(args, exclude, skip_rules, only_rules, no_entropy)
+        return _scan_staged(exclude, skip_rules, only_rules, custom_rules)
+    return _scan_path(
+        args, exclude, skip_rules, only_rules, no_entropy, custom_rules
+    )
 
 def has_blocking_findings(findings, severity_threshold):
     """Return True if any finding meets or exceeds the severity threshold."""
@@ -347,6 +371,28 @@ def has_blocking_findings(findings, severity_threshold):
         if levels.get(f_sev, 2) >= threshold_val:
             return True
     return False
+
+
+def _load_custom_rules(args, config, config_file):
+    """Compile custom rules from config['rules'] and --rules-path.
+
+    Both sources share one id namespace with the built-in rules, so a name
+    that collides anywhere fails the scan. Any manifest problem is reported
+    as a fatal configuration error (exit code 2) rather than ignored.
+    """
+
+    seen = {rid: "a built-in rule" for rid in known_rule_ids()}
+    custom = []
+    try:
+        if "rules" in config:
+            custom += compile_custom_rules(
+                config["rules"], source=config_file, seen=seen
+            )
+        if getattr(args, "rules_path", None):
+            custom += load_rules_file(args.rules_path, seen=seen)
+    except RuleManifestError as exc:
+        _config_fatal(f"Error: {exc}")
+    return custom
 
 
 def cmd_scan(args):
@@ -369,7 +415,9 @@ def cmd_scan(args):
         "severity", "low"
     )
 
-    unknown = unknown_rule_ids(skip_rules + only_rules)
+    custom_rules = _load_custom_rules(args, config, config_file)
+
+    unknown = unknown_rule_ids(skip_rules + only_rules, custom_rules)
     if unknown:
         print(
             "unknown rule id{}: {}".format(
@@ -383,11 +431,13 @@ def cmd_scan(args):
         return 2
 
     if args.list_rules:
-        return list_rules()
+        return list_rules(custom_rules)
 
     baseline = resolve_baseline(args, config)
 
-    findings = _run_scan(args, exclude, skip_rules, only_rules, no_entropy)
+    findings = _run_scan(
+        args, exclude, skip_rules, only_rules, no_entropy, custom_rules
+    )
 
     findings = filter_baseline(findings, baseline)
 
@@ -425,6 +475,7 @@ def cmd_init(args):
         "no_entropy": False,
         "skip_rules": [],
         "only_rules": [],
+        "rules": [],
     }
 
     try:

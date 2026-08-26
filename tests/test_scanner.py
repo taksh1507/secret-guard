@@ -5,9 +5,11 @@ import shutil
 import tempfile
 import unittest
 
+from secretguard.rules import compile_custom_rules
 from secretguard.scanner import HAS_PATHSPEC, Scanner, line_number
 
 TOKEN = "ghp_1234567890abcdefghijklmnopqrstuvwxyz"
+CUSTOM_SECRET = "acme_tok_0123456789abcdef0123"
 
 
 def has_rule(findings, rule):
@@ -148,6 +150,70 @@ class ScannerTest(unittest.TestCase):
         self.assertEqual(line_number("", 0), 1)
         self.assertEqual(line_number("a\nb\nc", 0), 1)
         self.assertEqual(line_number("a\nb\nc", 4), 3)
+
+
+class CustomRuleScannerTest(unittest.TestCase):
+    def setUp(self):
+        self._tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self._tmp, True)
+
+    def write(self, rel, content):
+        path = os.path.join(self._tmp, rel)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as handle:
+            handle.write(content)
+        return path
+
+    def custom_rules(self):
+        return compile_custom_rules(
+            [
+                {
+                    "name": "Acme Token",
+                    "pattern": "acme_tok_[a-f0-9]{20,}",
+                    "severity": "critical",
+                    "description": "Acme platform API token.",
+                }
+            ]
+        )
+
+    def make_scanner(self, **kwargs):
+        kwargs.setdefault("root", self._tmp)
+        kwargs.setdefault("custom_rules", self.custom_rules())
+        return Scanner(**kwargs)
+
+    def test_custom_rule_detects_secret(self):
+        self.write("config.py", f"api = '{CUSTOM_SECRET}'")
+        findings = self.make_scanner().scan()
+        self.assertTrue(has_rule(findings, "Acme Token"))
+
+    def test_custom_rule_carries_severity_and_description(self):
+        self.write("config.py", f"api = '{CUSTOM_SECRET}'")
+        finding = next(
+            f for f in self.make_scanner().scan() if f["rule"] == "Acme Token"
+        )
+        self.assertEqual(finding["severity"], "critical")
+        self.assertEqual(finding["rule_id"], "acme-token")
+        self.assertEqual(finding["description"], "Acme platform API token.")
+
+    def test_custom_rule_runs_alongside_builtins(self):
+        self.write("config.py", f"gh = {TOKEN}\napi = '{CUSTOM_SECRET}'")
+        rules = [f["rule"] for f in self.make_scanner().scan()]
+        self.assertIn("Acme Token", rules)
+        self.assertIn("GitHub Token", rules)
+
+    def test_custom_rule_respects_only_rule(self):
+        self.write("config.py", f"gh = {TOKEN}\napi = '{CUSTOM_SECRET}'")
+        scanner = self.make_scanner(only_rules=["acme-token"])
+        rules = [f["rule"] for f in scanner.scan()]
+        self.assertIn("Acme Token", rules)
+        self.assertNotIn("GitHub Token", rules)
+
+    def test_custom_rule_respects_skip_rule(self):
+        self.write("config.py", f"api = '{CUSTOM_SECRET}'")
+        scanner = self.make_scanner(
+            skip_rules=["acme-token"], include_entropy=False
+        )
+        self.assertFalse(has_rule(scanner.scan(), "Acme Token"))
 
 
 if __name__ == "__main__":
