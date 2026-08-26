@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.6.0](https://github.com/taksh1507/secret-guard/compare/v0.5.0...v0.6.0) (2026-08-26)
+
+
+### Features
+
+* custom rule manifests (closes [#9](https://github.com/taksh1507/secret-guard/issues/9)) ([#70](https://github.com/taksh1507/secret-guard/issues/70)) ([9290242](https://github.com/taksh1507/secret-guard/commit/9290242b58e435fe9f7405aff83c3fe9158229ef))
+* **rules:** add GitLab PAT, Hugging Face token, and Slack webhook detection ([#72](https://github.com/taksh1507/secret-guard/issues/72)) ([20a7f65](https://github.com/taksh1507/secret-guard/commit/20a7f659ede74b844dba0b84855ea3d9e6152797))
+
 ## [0.5.0](https://github.com/taksh1507/secret-guard/compare/v0.4.0...v0.5.0) (2026-08-24)
 
 
