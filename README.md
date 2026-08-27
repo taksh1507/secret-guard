@@ -20,15 +20,16 @@ before they reach your git history.
 
 ## What it does
 
-secret-guard scans source files for hardcoded credentials using **13 pattern
+secret-guard scans source files for hardcoded credentials using **30 pattern
 rules** plus **Shannon-entropy detection**, and reports each finding with a
 severity and a **masked** value. By default it never prints the secret itself.
 
 | Category | Rules |
 | --- | --- |
-| Cloud / SaaS | AWS Access Key IDs, AWS temporary & dashed keys, Google API Keys, Stripe live keys |
-| Tokens | GitHub PAT (classic & fine-grained), Slack tokens, Square access tokens, JWTs |
+| Cloud / SaaS | AWS Access Key IDs, AWS temporary & dashed keys, Google API Keys, Stripe live keys, Shopify access tokens, Mailgun API keys |
+| Tokens | GitHub PAT (classic & fine-grained), Slack tokens, Square access tokens, JWTs, PyPI API tokens, npm/Hugging Face/GitLab tokens |
 | Key material | RSA / EC / DSA / OpenSSH / PGP private keys (`CRITICAL`) |
+| Databases | PostgreSQL and MongoDB connection URIs with embedded credentials |
 | Heuristics | Generic secret keys, credential assignments, high-entropy strings |
 
 On top of pattern matching, `secret-guard` catches **`.env` files** with
