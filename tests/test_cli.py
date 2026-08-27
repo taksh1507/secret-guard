@@ -71,6 +71,19 @@ class CliTest(unittest.TestCase):
             self.assertEqual(result.returncode, 1)
             self.assertIsNotNone(__import__("json").loads(result.stdout))
 
+    def test_scan_sarif_emits_parseable_output(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "secret.py").write_text(
+                f"TOKEN = '{SECRET}'", encoding="utf-8"
+            )
+            result = self.run_cli(tmp, "scan", "--sarif", ".")
+            self.assertEqual(result.returncode, 1)
+            sarif_data = json.loads(result.stdout)
+            self.assertEqual(sarif_data["version"], "2.1.0")
+            self.assertEqual(sarif_data["runs"][0]["tool"]["driver"]["name"], "secret-guard")
+            self.assertGreaterEqual(len(sarif_data["runs"][0]["results"]), 1)
+
+
     def test_scan_excludes_extra_directory(self):
         with tempfile.TemporaryDirectory() as tmp:
             Path(tmp, "wip").mkdir()

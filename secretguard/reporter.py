@@ -95,3 +95,117 @@ def format_json(findings, root, show_value=False):
         {"schema_version": SCHEMA_VERSION, "root": root, "findings": sanitized},
         indent=2,
     )
+
+
+def format_sarif(findings, root, show_value=False, version="0.6.0", custom_rules=None):
+    from .rules import RULES, SPECIAL_RULES
+
+    # Build a map of all known rule metadata
+    all_rules_dict = {}
+    for r in RULES:
+        all_rules_dict[r["id"]] = {
+            "id": r["id"],
+            "name": r["name"],
+            "severity": r["severity"],
+            "description": r.get("description", ""),
+        }
+    for r_id, r in SPECIAL_RULES.items():
+        all_rules_dict[r_id] = {
+            "id": r_id,
+            "name": r["name"],
+            "severity": r["severity"],
+            "description": r.get("description", ""),
+        }
+    if custom_rules:
+        for r in custom_rules:
+            all_rules_dict[r["id"]] = {
+                "id": r["id"],
+                "name": r["name"],
+                "severity": r["severity"],
+                "description": r.get("description", ""),
+            }
+
+    # Gather rules mentioned in findings but not in our dictionary
+    for f in findings:
+        r_id = f.get("rule_id")
+        if r_id and r_id not in all_rules_dict:
+            all_rules_dict[r_id] = {
+                "id": r_id,
+                "name": f.get("rule", r_id),
+                "severity": f.get("severity", "medium"),
+                "description": f.get("description", ""),
+            }
+
+    # Map severities to SARIF level configurations
+    severity_map = {
+        "critical": "error",
+        "high": "error",
+        "medium": "warning",
+        "low": "note",
+    }
+
+    # Format the rules array for the SARIF run
+    sarif_rules = []
+    for r_id in sorted(all_rules_dict.keys()):
+        r = all_rules_dict[r_id]
+        level = severity_map.get(r["severity"].lower(), "warning")
+        rule_obj = {
+            "id": r["id"],
+            "name": r["name"],
+            "shortDescription": {"text": r["name"]},
+            "fullDescription": {"text": r["description"] or r["name"]},
+            "defaultConfiguration": {"level": level},
+        }
+        sarif_rules.append(rule_obj)
+
+    # Format the results array
+    sarif_results = []
+    for f in sorted(
+        findings, key=lambda x: (x["path"], x["line"], x.get("rule_id", ""))
+    ):
+        r_id = f.get("rule_id", "generic-secret-key")
+        r_name = f.get("rule", "Generic Secret Key")
+        line = f.get("line", 1)
+        path = f.get("path", "")
+        severity = f.get("severity", "medium")
+
+        # Mask the value if not show_value
+        val = f["value"][:]
+        if not show_value and not f.get("reveal"):
+            val = mask(val)
+
+        msg_text = f"{r_name}: {val}"
+        rel_path = path.replace("\\", "/")
+
+        result_obj = {
+            "ruleId": r_id,
+            "level": severity_map.get(severity.lower(), "warning"),
+            "message": {"text": msg_text},
+            "locations": [
+                {
+                    "physicalLocation": {
+                        "artifactLocation": {"uri": rel_path},
+                        "region": {"startLine": line, "startColumn": 1},
+                    }
+                }
+            ],
+        }
+        sarif_results.append(result_obj)
+
+    sarif_data = {
+        "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+        "version": "2.1.0",
+        "runs": [
+            {
+                "tool": {
+                    "driver": {
+                        "name": "secret-guard",
+                        "version": version,
+                        "rules": sarif_rules,
+                    }
+                },
+                "results": sarif_results,
+            }
+        ],
+    }
+    return json.dumps(sarif_data, indent=2)

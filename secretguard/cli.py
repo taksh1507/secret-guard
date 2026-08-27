@@ -8,7 +8,7 @@ import subprocess
 import sys
 
 from . import __version__
-from .reporter import format_console, format_json
+from .reporter import format_console, format_json, format_sarif
 from .rules import (
     RULES,
     SPECIAL_RULES,
@@ -160,6 +160,9 @@ def build_parser():
     )
     scan.add_argument(
         "--json", action="store_true", help="Output JSON instead of a report.",
+    )
+    scan.add_argument(
+        "--sarif", action="store_true", help="Output findings in SARIF format.",
     )
     scan.add_argument(
         "--show-value", action="store_true",
@@ -445,6 +448,16 @@ def cmd_scan(args):
         print(
             format_json(
                 findings, os.path.abspath(args.path), show_value=args.show_value
+            )
+        )
+    elif args.sarif:
+        print(
+            format_sarif(
+                findings,
+                os.path.abspath(args.path),
+                show_value=args.show_value,
+                version=__version__,
+                custom_rules=custom_rules,
             )
         )
     else:

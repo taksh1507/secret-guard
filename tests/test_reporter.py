@@ -4,7 +4,7 @@ import json
 import re
 import unittest
 
-from secretguard.reporter import format_console, format_json, mask, summarize
+from secretguard.reporter import format_console, format_json, format_sarif, mask, summarize
 
 
 def finding(
@@ -179,6 +179,97 @@ class JsonSchemaTest(unittest.TestCase):
         first = format_json(list(findings), ".")
         second = format_json(list(reversed(findings)), ".")
         self.assertEqual(first, second)
+
+class FormatSarifTest(unittest.TestCase):
+    def test_basic_sarif_structure(self):
+        findings = [
+            {
+                "path": "app.py",
+                "value": "ghp_secretvalue123",
+                "rule": "GitHub Token",
+                "rule_id": "github-token",
+                "severity": "high",
+                "line": 4,
+                "description": "GitHub Personal Access / OAuth token.",
+            }
+        ]
+        sarif_str = format_sarif(findings, "/repo", show_value=False, version="1.2.3")
+        sarif_data = json.loads(sarif_str)
+
+        self.assertEqual(sarif_data["version"], "2.1.0")
+        self.assertIn("$schema", sarif_data)
+        self.assertEqual(len(sarif_data["runs"]), 1)
+
+        run = sarif_data["runs"][0]
+        self.assertEqual(run["tool"]["driver"]["name"], "secret-guard")
+        self.assertEqual(run["tool"]["driver"]["version"], "1.2.3")
+
+        # Verify that all rules are present
+        rules = run["tool"]["driver"]["rules"]
+        self.assertGreater(len(rules), 1)
+        rule_ids = {r["id"] for r in rules}
+        self.assertIn("github-token", rule_ids)
+        self.assertIn("private-key", rule_ids)
+
+        # Verify the findings are correctly reported as results
+        self.assertEqual(len(run["results"]), 1)
+        res = run["results"][0]
+        self.assertEqual(res["ruleId"], "github-token")
+        self.assertEqual(res["level"], "error")
+        self.assertIn("ghp_se", res["message"]["text"])
+        self.assertNotIn("secretvalue", res["message"]["text"])
+
+        # Check locations
+        loc = res["locations"][0]
+        self.assertEqual(loc["physicalLocation"]["artifactLocation"]["uri"], "app.py")
+        self.assertEqual(loc["physicalLocation"]["region"]["startLine"], 4)
+        self.assertEqual(loc["physicalLocation"]["region"]["startColumn"], 1)
+
+    def test_sarif_show_value(self):
+        findings = [
+            {
+                "path": "src/config.py",
+                "value": "ghp_myactualsecret",
+                "rule": "GitHub Token",
+                "rule_id": "github-token",
+                "severity": "high",
+                "line": 10,
+                "description": "GitHub Token",
+            }
+        ]
+        sarif_str = format_sarif(findings, "/repo", show_value=True)
+        sarif_data = json.loads(sarif_str)
+        res = sarif_data["runs"][0]["results"][0]
+        self.assertIn("ghp_myactualsecret", res["message"]["text"])
+
+    def test_sarif_custom_rules_and_unknown(self):
+        findings = [
+            {
+                "path": "app.js",
+                "value": "custom_val",
+                "rule": "My Custom Rule",
+                "rule_id": "my-custom-rule",
+                "severity": "medium",
+                "line": 5,
+                "description": "Custom description",
+            }
+        ]
+        custom_rules = [
+            {
+                "id": "my-custom-rule",
+                "name": "My Custom Rule",
+                "severity": "medium",
+                "description": "Custom description",
+            }
+        ]
+        sarif_str = format_sarif(
+            findings, "/repo", show_value=False, custom_rules=custom_rules
+        )
+        sarif_data = json.loads(sarif_str)
+        rules = sarif_data["runs"][0]["tool"]["driver"]["rules"]
+        rule_ids = {r["id"] for r in rules}
+        self.assertIn("my-custom-rule", rule_ids)
+        self.assertEqual(sarif_data["runs"][0]["results"][0]["level"], "warning")
 
 
 if __name__ == "__main__":

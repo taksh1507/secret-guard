@@ -210,6 +210,7 @@ options:
   --exclude DIR     Skip additional directory names (repeatable)
   --no-entropy      Disable high-entropy string detection
   --json            Output findings as JSON
+  --sarif           Output findings in SARIF format
   --show-value      Print full secret values (default masks them)
   --staged          Scan only files staged in git
   --skip-rule RULE  Never run the given rule id (repeatable)
@@ -407,8 +408,8 @@ issues per our [Security Policy](SECURITY.md).
 - [x] git hook + pre-commit integration
 - [x] OIDC trusted publishing to PyPI
 - [ ] Git history scanning
-- [ ] Baseline / allowlist support
-- [ ] SARIF output for GitHub code scanning
+- [x] Baseline / allowlist support
+- [x] SARIF output for GitHub code scanning
 - [x] Custom rule manifests
 
 ## License
