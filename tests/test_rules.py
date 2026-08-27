@@ -197,7 +197,10 @@ class RuleDetectionTest(unittest.TestCase):
         )
 
     def test_pypi_api_token(self):
-        token = "pypi-" + "AgEIcHlwaS5vcmcNDExxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        token = (
+            "pypi-"
+            + "AgEIcHlwaS5vcmcNDExxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        )
         self.assertIn(
             "PyPI API Token",
             rule_names(f"token = {token}"),

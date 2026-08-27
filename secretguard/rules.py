@@ -185,13 +185,13 @@ RULES = [
         description="Mailgun API key.",
     ),
     _r(
-        r"postgresql://[^:]+:[^@]+@[^/]+(?:/[^?]+)?",
+        r"\bpostgresql://[^:\s/]+:[^@\s/]+@(?:[A-Za-z0-9.-]+|\[[0-9a-f:]+\])(?::\d+)?(?:/[^\s]*)?",
         "PostgreSQL Connection URI",
         severity="high",
         description="PostgreSQL connection URI containing credentials.",
     ),
     _r(
-        r"mongodb(?:\+srv)?://[^:]+:[^@]+@[^/]+(?:/[^?]+)?",
+        r"\bmongodb(?:\+srv)?://[^:\s/]+:[^@\s/]+@(?:[A-Za-z0-9.-]+|\[[0-9a-f:]+\])(?::\d+)?(?:/[^\s]*)?",
         "MongoDB Connection URI",
         severity="high",
         description="MongoDB connection URI containing credentials.",
