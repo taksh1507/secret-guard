@@ -184,6 +184,11 @@ def build_parser():
         help="Minimum severity threshold to fail the scan (default: low).",
     )
     scan.add_argument(
+        "--max-findings", type=int, default=None, metavar="N",
+        help="Cap the number of findings printed/returned to N. The scan still "
+             "reports the full summary and exits non-zero when secrets are found.",
+    )
+    scan.add_argument(
         "--skip-rule", action="append", default=[], metavar="RULE",
         help="Never run the given rule id (repeatable). Mixes with --only-rule.",
     )
@@ -441,17 +446,26 @@ def cmd_scan(args):
 
     findings = filter_baseline(findings, baseline)
 
+    max_findings = getattr(args, "max_findings", None)
+    truncated = False
+    shown = findings
+    if max_findings is not None and len(findings) > max_findings:
+        truncated = True
+        shown = findings[:max_findings]
+
     if args.json:
         print(
             format_json(
-                findings, os.path.abspath(args.path), show_value=args.show_value
+                shown, os.path.abspath(args.path), show_value=args.show_value,
+                truncated=truncated, total_findings=len(findings),
             )
         )
     else:
         color = False if args.no_color else None
         print(
             format_console(
-                findings, args.path, show_value=args.show_value, color=color
+                shown, args.path, show_value=args.show_value, color=color,
+                truncated=truncated, total_findings=len(findings),
             )
         )
     return 1 if has_blocking_findings(findings, severity_threshold) else 0

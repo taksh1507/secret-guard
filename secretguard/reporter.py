@@ -28,7 +28,14 @@ def mask(value, visible=6):
         return "*" * len(value)
     return value[:visible] + "*" * max(0, len(value) - visible - 0)
 
-def format_console(findings, root, show_value=True, color=None):
+def format_console(
+    findings,
+    root,
+    show_value=True,
+    color=None,
+    truncated=False,
+    total_findings=None,
+):
     color = should_color(force=color)
     lines = []
     for finding in sorted(findings, key=lambda f: (f["path"], f["line"])):
@@ -50,16 +57,33 @@ def format_console(findings, root, show_value=True, color=None):
         )
     lines.append("")
     summary = summarize(findings)
-    summary_line = (
-        "{critical} critical, {high} high, {medium} medium, {low} low — "
-        "{total} total"
-    ).format(
-        critical=summary["critical"],
-        high=summary["high"],
-        medium=summary["medium"],
-        low=summary["low"],
-        total=summary["total"],
-    )
+    if truncated:
+        summary["truncated"] = total_findings - len(findings)
+        summary_line = (
+            "{critical} critical, {high} high, {medium} medium, {low} low — "
+            "{total} total (showing {shown} of {total_findings}; "
+            "{truncated} truncated)"
+        ).format(
+            critical=summary["critical"],
+            high=summary["high"],
+            medium=summary["medium"],
+            low=summary["low"],
+            total=summary["total"],
+            shown=len(findings),
+            total_findings=total_findings,
+            truncated=summary["truncated"],
+        )
+    else:
+        summary_line = (
+            "{critical} critical, {high} high, {medium} medium, {low} low — "
+            "{total} total"
+        ).format(
+            critical=summary["critical"],
+            high=summary["high"],
+            medium=summary["medium"],
+            low=summary["low"],
+            total=summary["total"],
+        )
     if color:
         summary_line = (
             "\033[31m{critical}\033[0m critical, "
@@ -83,7 +107,7 @@ def summarize(findings):
     return counts
 
 
-def format_json(findings, root, show_value=False):
+def format_json(findings, root, show_value=False, truncated=False, total_findings=None):
     ordered = sorted(findings, key=lambda f: (f["path"], f["line"], f["rule"]))
     sanitized = []
     for finding in ordered:
@@ -91,7 +115,12 @@ def format_json(findings, root, show_value=False):
         if not show_value and not finding.get("reveal"):
             item["value"] = mask(item["value"])
         sanitized.append(item)
-    return json.dumps(
-        {"schema_version": SCHEMA_VERSION, "root": root, "findings": sanitized},
-        indent=2,
-    )
+    payload = {
+        "schema_version": SCHEMA_VERSION,
+        "root": root,
+        "findings": sanitized,
+    }
+    if truncated:
+        payload["truncated"] = True
+        payload["total_findings"] = total_findings
+    return json.dumps(payload, indent=2)
