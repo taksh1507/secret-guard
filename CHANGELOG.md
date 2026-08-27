@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.7.0](https://github.com/taksh1507/secret-guard/compare/v0.6.0...v0.7.0) (2026-08-27)
+
+
+### Features
+
+* add --max-findings to cap scan output ([#77](https://github.com/taksh1507/secret-guard/issues/77)) ([757e842](https://github.com/taksh1507/secret-guard/commit/757e84216bd2aff265efc1dc56da779964eba16c))
+* **rules:** add PyPI, Shopify, Mailgun, and database connection URI rules ([#75](https://github.com/taksh1507/secret-guard/issues/75)) ([a9667a6](https://github.com/taksh1507/secret-guard/commit/a9667a67476e50aac1fbf75370b271ff2f6ca90c))
+
 ## [0.6.0](https://github.com/taksh1507/secret-guard/compare/v0.5.0...v0.6.0) (2026-08-26)
 
 
