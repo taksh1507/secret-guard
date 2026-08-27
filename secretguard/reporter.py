@@ -28,7 +28,14 @@ def mask(value, visible=6):
         return "*" * len(value)
     return value[:visible] + "*" * max(0, len(value) - visible - 0)
 
-def format_console(findings, root, show_value=True, color=None, truncated=False, total_findings=None):
+def format_console(
+    findings,
+    root,
+    show_value=True,
+    color=None,
+    truncated=False,
+    total_findings=None,
+):
     color = should_color(force=color)
     lines = []
     for finding in sorted(findings, key=lambda f: (f["path"], f["line"])):
