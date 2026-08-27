@@ -196,6 +196,51 @@ class RuleDetectionTest(unittest.TestCase):
             rule_names(f"webhook = {webhook_url}"),
         )
 
+    def test_pypi_api_token(self):
+        token = (
+            "pypi-"
+            + "AgEIcHlwaS5vcmcNDExxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        )
+        self.assertIn(
+            "PyPI API Token",
+            rule_names(f"token = {token}"),
+        )
+
+    def test_shopify_access_token(self):
+        token1 = "shpat_" + "0123456789abcdef0123456789abcdef"
+        token2 = "shpca_" + "0123456789abcdef0123456789abcdef"
+        self.assertIn(
+            "Shopify Access Token",
+            rule_names(f"token = {token1}"),
+        )
+        self.assertIn(
+            "Shopify Access Token",
+            rule_names(f"token = {token2}"),
+        )
+
+    def test_mailgun_api_key(self):
+        key = "key-" + "0123456789abcdef0123456789abcdef"
+        self.assertIn(
+            "Mailgun API Key",
+            rule_names(f"api_key = {key}"),
+        )
+
+    def test_postgresql_connection_uri(self):
+        self.assertIn(
+            "PostgreSQL Connection URI",
+            rule_names("db = postgresql://user:password@localhost:5432/mydb"),
+        )
+
+    def test_mongodb_connection_uri(self):
+        self.assertIn(
+            "MongoDB Connection URI",
+            rule_names("db = mongodb://user:password@localhost:27017/mydb"),
+        )
+        self.assertIn(
+            "MongoDB Connection URI",
+            rule_names("db = mongodb+srv://user:password@cluster.example.com/mydb"),
+        )
+
     def test_generic_secret_key(self):
         self.assertIn(
             "Generic Secret Key",

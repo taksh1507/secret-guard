@@ -167,6 +167,36 @@ RULES = [
         description="Slack Incoming Webhook URL.",
     ),
     _r(
+        r"pypi-[a-z0-9_.-]{50,}",
+        "PyPI API Token",
+        severity="high",
+        description="PyPI API access token.",
+    ),
+    _r(
+        r"shp(at|ca|pa|ua|ss)_[a-f0-9]{32}",
+        "Shopify Access Token",
+        severity="high",
+        description="Shopify API access token or secret.",
+    ),
+    _r(
+        r"key-[a-z0-9]{32}",
+        "Mailgun API Key",
+        severity="high",
+        description="Mailgun API key.",
+    ),
+    _r(
+        r"\bpostgresql://[^:\s/]+:[^@\s/]+@(?:[A-Za-z0-9.-]+|\[[0-9a-f:]+\])(?::\d+)?(?:/[^\s]*)?",
+        "PostgreSQL Connection URI",
+        severity="high",
+        description="PostgreSQL connection URI containing credentials.",
+    ),
+    _r(
+        r"\bmongodb(?:\+srv)?://[^:\s/]+:[^@\s/]+@(?:[A-Za-z0-9.-]+|\[[0-9a-f:]+\])(?::\d+)?(?:/[^\s]*)?",
+        "MongoDB Connection URI",
+        severity="high",
+        description="MongoDB connection URI containing credentials.",
+    ),
+    _r(
         r"sk-[0-9a-fA-F]{32,}",
         "Generic Secret Key",
         severity="medium",
