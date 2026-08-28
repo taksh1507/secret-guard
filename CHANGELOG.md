@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.1](https://github.com/taksh1507/secret-guard/compare/v0.7.0...v0.7.1) (2026-08-28)
+
+
+### Documentation
+
+* professionalize README and sync with current features ([#85](https://github.com/taksh1507/secret-guard/issues/85)) ([eff7b29](https://github.com/taksh1507/secret-guard/commit/eff7b299ff0d77e1004a74a9bb8ccb7920393e29))
+
 ## [0.7.0](https://github.com/taksh1507/secret-guard/compare/v0.6.0...v0.7.0) (2026-08-27)
 
 
