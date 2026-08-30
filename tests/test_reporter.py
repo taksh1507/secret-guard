@@ -51,7 +51,7 @@ class MaskTest(unittest.TestCase):
         self.assertEqual(mask("abcdefgh", reveal_prefix=2, reveal_suffix=2), "ab****gh")
 
     def test_reveal_overlap_masks_completely(self):
-        # If pref_len + suff_len >= val_len, it should mask completely to prevent full leak
+        # If pref_len + suff_len >= val_len it masks completely, preventing leak
         self.assertEqual(mask("abc", reveal_prefix=4), "***")
         self.assertEqual(mask("abcd", reveal_prefix=4), "****")
         self.assertEqual(mask("abcd", reveal_prefix=2, reveal_suffix=2), "****")
@@ -131,12 +131,16 @@ class FormatConsoleTest(unittest.TestCase):
 
     def test_reveal_prefix_option(self):
         value = "ghp_secretvalue123"
-        report = format_console([finding(value=value)], ".", show_value=False, reveal_prefix=4)
+        report = format_console(
+            [finding(value=value)], ".", show_value=False, reveal_prefix=4
+        )
         self.assertIn("ghp_**************", report)
 
     def test_reveal_suffix_option(self):
         value = "ghp_secretvalue123"
-        report = format_console([finding(value=value)], ".", show_value=False, reveal_suffix=3)
+        report = format_console(
+            [finding(value=value)], ".", show_value=False, reveal_suffix=3
+        )
         self.assertIn("***************123", report)
 
 
@@ -161,12 +165,16 @@ class FormatJsonTest(unittest.TestCase):
 
     def test_reveal_prefix_json(self):
         findings = [finding(severity="high", value="ghp_secretvalue123")]
-        payload = json.loads(format_json(findings, "/repo", show_value=False, reveal_prefix=4))
+        payload = json.loads(
+            format_json(findings, "/repo", show_value=False, reveal_prefix=4)
+        )
         self.assertEqual(payload["findings"][0]["value"], "ghp_**************")
 
     def test_reveal_suffix_json(self):
         findings = [finding(severity="high", value="ghp_secretvalue123")]
-        payload = json.loads(format_json(findings, "/repo", show_value=False, reveal_suffix=3))
+        payload = json.loads(
+            format_json(findings, "/repo", show_value=False, reveal_suffix=3)
+        )
         self.assertEqual(payload["findings"][0]["value"], "***************123")
 
     def test_valid_json(self):

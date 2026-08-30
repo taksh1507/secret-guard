@@ -171,15 +171,24 @@ def build_parser():
     )
     scan.add_argument(
         "--show-value", action="store_true",
-        help="Print full secret values (default masks them). Takes precedence over --reveal-prefix and --reveal-suffix.",
+        help=(
+            "Print full secret values (default masks them). Takes precedence "
+            "over --reveal-prefix and --reveal-suffix."
+        ),
     )
     scan.add_argument(
         "--reveal-prefix", type=int, default=None, metavar="N",
-        help="Show first N characters of the masked secret. Ignored if --show-value is set.",
+        help=(
+            "Show first N characters of the masked secret. "
+            "Ignored if --show-value is set."
+        ),
     )
     scan.add_argument(
         "--reveal-suffix", type=int, default=None, metavar="N",
-        help="Show last N characters of the masked secret. Ignored if --show-value is set.",
+        help=(
+            "Show last N characters of the masked secret. "
+            "Ignored if --show-value is set."
+        ),
     )
     scan.add_argument(
         "--no-color", action="store_true",

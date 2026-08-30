@@ -61,7 +61,11 @@ def format_console(
             tag = SEVERITY_COLORS[severity] + tag + RESET
         value = finding["value"][:]
         if not show_value and not finding.get("reveal"):
-            value = mask(value, reveal_prefix=reveal_prefix, reveal_suffix=reveal_suffix)
+            value = mask(
+                value,
+                reveal_prefix=reveal_prefix,
+                reveal_suffix=reveal_suffix,
+            )
         lines.append(
             "{path}:{line} [{tag}] {rule}: {value}".format(
                 path=finding["path"],
@@ -123,13 +127,25 @@ def summarize(findings):
     return counts
 
 
-def format_json(findings, root, show_value=False, truncated=False, total_findings=None, reveal_prefix=None, reveal_suffix=None):
+def format_json(
+    findings,
+    root,
+    show_value=False,
+    truncated=False,
+    total_findings=None,
+    reveal_prefix=None,
+    reveal_suffix=None,
+):
     ordered = sorted(findings, key=lambda f: (f["path"], f["line"], f["rule"]))
     sanitized = []
     for finding in ordered:
         item = dict(finding)
         if not show_value and not finding.get("reveal"):
-            item["value"] = mask(item["value"], reveal_prefix=reveal_prefix, reveal_suffix=reveal_suffix)
+            item["value"] = mask(
+                item["value"],
+                reveal_prefix=reveal_prefix,
+                reveal_suffix=reveal_suffix,
+            )
         sanitized.append(item)
     payload = {
         "schema_version": SCHEMA_VERSION,
