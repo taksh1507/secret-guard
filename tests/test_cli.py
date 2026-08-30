@@ -71,6 +71,24 @@ class CliTest(unittest.TestCase):
             self.assertEqual(result.returncode, 1)
             self.assertIsNotNone(__import__("json").loads(result.stdout))
 
+    def test_scan_reveal_prefix_option(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "secret.py").write_text(
+                f"TOKEN = '{SECRET}'", encoding="utf-8"
+            )
+            result = self.run_cli(tmp, "scan", "--reveal-prefix", "4", ".")
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("ghp_************************************", result.stdout)
+
+    def test_scan_reveal_suffix_option(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "secret.py").write_text(
+                f"TOKEN = '{SECRET}'", encoding="utf-8"
+            )
+            result = self.run_cli(tmp, "scan", "--reveal-suffix", "4", ".")
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("************************************wxyz", result.stdout)
+
     def test_scan_excludes_extra_directory(self):
         with tempfile.TemporaryDirectory() as tmp:
             Path(tmp, "wip").mkdir()

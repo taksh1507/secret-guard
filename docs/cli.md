@@ -22,6 +22,8 @@ secret-guard scan [path] [options]
 | `--no-entropy` | Disable high-entropy string detection |
 | `--json` | Output findings as JSON |
 | `--show-value` | Print full secret values (default masks them) |
+| `--reveal-prefix N` | Show first N characters of the masked secret |
+| `--reveal-suffix N` | Show last N characters of the masked secret |
 | `--staged` | Scan only files staged in git |
 | `--skip-rule RULE` | Never run the given rule id (repeatable) |
 | `--only-rule RULE` | Run only the given rule id (repeatable) |
@@ -56,6 +58,14 @@ commit — exactly what would otherwise be committed.
 ### `--json`
 
 Emits stable JSON. `--show-value` controls whether masked or raw values appear.
+
+### `--reveal-prefix` / `--reveal-suffix`
+
+- `--reveal-prefix N` shows the first `N` characters of the masked secret, keeping the rest masked.
+- `--reveal-suffix N` shows the last `N` characters of the masked secret, keeping the rest masked.
+- If both are provided, they reveal their respective parts and mask the middle.
+- If the sum of prefix and suffix reveal lengths is greater than or equal to the secret length, the secret is completely masked to prevent accidental leakage of the full secret value.
+- `--show-value` always takes precedence and will print the full unmasked secret value, ignoring these flags.
 
 ### `--exclude`
 
