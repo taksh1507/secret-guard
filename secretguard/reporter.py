@@ -23,10 +23,24 @@ def should_color(force=None):
     return sys.stdout.isatty() and os.environ.get("NO_COLOR") is None
 
 
-def mask(value, visible=6):
-    if len(value) <= visible + 4:
-        return "*" * len(value)
-    return value[:visible] + "*" * max(0, len(value) - visible - 0)
+def mask(value, reveal_prefix=None, reveal_suffix=None):
+    if reveal_prefix is None and reveal_suffix is None:
+        visible = 6
+        if len(value) <= visible + 4:
+            return "*" * len(value)
+        return value[:visible] + "*" * max(0, len(value) - visible)
+
+    pref_len = max(0, reveal_prefix) if reveal_prefix is not None else 0
+    suff_len = max(0, reveal_suffix) if reveal_suffix is not None else 0
+    val_len = len(value)
+
+    if pref_len + suff_len >= val_len:
+        return "*" * val_len
+
+    middle_stars = val_len - pref_len - suff_len
+    suffix_part = value[val_len - suff_len:] if suff_len > 0 else ""
+    return value[:pref_len] + "*" * middle_stars + suffix_part
+
 
 def format_console(
     findings,
@@ -35,6 +49,8 @@ def format_console(
     color=None,
     truncated=False,
     total_findings=None,
+    reveal_prefix=None,
+    reveal_suffix=None,
 ):
     color = should_color(force=color)
     lines = []
@@ -45,7 +61,11 @@ def format_console(
             tag = SEVERITY_COLORS[severity] + tag + RESET
         value = finding["value"][:]
         if not show_value and not finding.get("reveal"):
-            value = mask(value)
+            value = mask(
+                value,
+                reveal_prefix=reveal_prefix,
+                reveal_suffix=reveal_suffix,
+            )
         lines.append(
             "{path}:{line} [{tag}] {rule}: {value}".format(
                 path=finding["path"],
@@ -107,13 +127,25 @@ def summarize(findings):
     return counts
 
 
-def format_json(findings, root, show_value=False, truncated=False, total_findings=None):
+def format_json(
+    findings,
+    root,
+    show_value=False,
+    truncated=False,
+    total_findings=None,
+    reveal_prefix=None,
+    reveal_suffix=None,
+):
     ordered = sorted(findings, key=lambda f: (f["path"], f["line"], f["rule"]))
     sanitized = []
     for finding in ordered:
         item = dict(finding)
         if not show_value and not finding.get("reveal"):
-            item["value"] = mask(item["value"])
+            item["value"] = mask(
+                item["value"],
+                reveal_prefix=reveal_prefix,
+                reveal_suffix=reveal_suffix,
+            )
         sanitized.append(item)
     payload = {
         "schema_version": SCHEMA_VERSION,

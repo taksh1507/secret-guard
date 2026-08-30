@@ -171,7 +171,24 @@ def build_parser():
     )
     scan.add_argument(
         "--show-value", action="store_true",
-        help="Print full secret values (default masks them).",
+        help=(
+            "Print full secret values (default masks them). Takes precedence "
+            "over --reveal-prefix and --reveal-suffix."
+        ),
+    )
+    scan.add_argument(
+        "--reveal-prefix", type=int, default=None, metavar="N",
+        help=(
+            "Show first N characters of the masked secret. "
+            "Ignored if --show-value is set."
+        ),
+    )
+    scan.add_argument(
+        "--reveal-suffix", type=int, default=None, metavar="N",
+        help=(
+            "Show last N characters of the masked secret. "
+            "Ignored if --show-value is set."
+        ),
     )
     scan.add_argument(
         "--no-color", action="store_true",
@@ -468,6 +485,7 @@ def cmd_scan(args):
             format_json(
                 shown, os.path.abspath(args.path), show_value=args.show_value,
                 truncated=truncated, total_findings=len(findings),
+                reveal_prefix=args.reveal_prefix, reveal_suffix=args.reveal_suffix,
             )
         )
     else:
@@ -476,6 +494,7 @@ def cmd_scan(args):
             format_console(
                 shown, args.path, show_value=args.show_value, color=color,
                 truncated=truncated, total_findings=len(findings),
+                reveal_prefix=args.reveal_prefix, reveal_suffix=args.reveal_suffix,
             )
         )
     return 1 if has_blocking_findings(findings, severity_threshold) else 0

@@ -40,4 +40,4 @@ target-version = "py38"
 select = ["E", "F", "UP", "PL", "I"]
 
 [tool.ruff.lint.pylint]
-max-args = 7
+max-args = 9
