@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "secret-guard-scan"
-version = "0.7.1"
+version = "0.8.0"
 description = "Scan your codebase for hardcoded secrets before they get committed."
 readme = "README.md"
 requires-python = ">=3.8"
