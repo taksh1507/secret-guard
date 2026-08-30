@@ -248,6 +248,7 @@ class CliTest(unittest.TestCase):
             data = json.loads(content)
             self.assertIn("exclude", data)
             self.assertIn("//", data)
+            self.assertIn("max_findings", data)
 
     def test_init_errors_if_file_exists(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -406,6 +407,41 @@ class CliTest(unittest.TestCase):
             result = self.run_cli(tmp, "scan", ".")
             self.assertEqual(result.returncode, 2)
             self.assertIn("Error: 'severity' in", result.stderr)
+
+    def test_scan_max_findings_config_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "secret.py").write_text(
+                f"TOKEN = '{SECRET}'\n", encoding="utf-8"
+            )
+            Path(tmp, "secret2.py").write_text(
+                f"TOKEN = '{SECRET}'\n", encoding="utf-8"
+            )
+            config_file = Path(tmp, "secret-guard.json")
+            config_content = {"max_findings": 1}
+            config_file.write_text(json.dumps(config_content), encoding="utf-8")
+
+            result = self.run_cli(tmp, "scan", "--json", ".")
+            self.assertEqual(result.returncode, 1)
+            payload = json.loads(result.stdout)
+            self.assertTrue(payload.get("truncated"))
+            self.assertGreater(payload.get("total_findings"), 1)
+            self.assertEqual(len(payload["findings"]), 1)
+
+            result_override = self.run_cli(
+                tmp, "scan", "--max-findings", "100", "."
+            )
+            self.assertEqual(result_override.returncode, 1)
+            self.assertNotIn("truncated", result_override.stdout)
+
+    def test_scan_max_findings_config_validation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config_file = Path(tmp, "secret-guard.json")
+            config_content = {"max_findings": "many"}
+            config_file.write_text(json.dumps(config_content), encoding="utf-8")
+
+            result = self.run_cli(tmp, "scan", ".")
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("Error: 'max_findings' in", result.stderr)
 
     def test_stdin_scan_detects_secret(self):
         result = subprocess.run(

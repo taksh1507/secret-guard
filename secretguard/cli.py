@@ -70,6 +70,7 @@ KNOWN_CONFIG_KEYS = {
     "rules",
     "baseline",
     "severity",
+    "max_findings",
 }
 
 
@@ -134,6 +135,13 @@ def load_config(config_path):
         _config_fatal(
             f"Error: 'severity' in {config_path} must be one of: "
             "low, medium, high, critical."
+        )
+    if "max_findings" in data and (
+        not isinstance(data["max_findings"], int)
+        or data["max_findings"] < 1
+    ):
+        _config_fatal(
+            f"Error: 'max_findings' in {config_path} must be a positive integer."
         )
     return data
 
@@ -447,6 +455,8 @@ def cmd_scan(args):
     findings = filter_baseline(findings, baseline)
 
     max_findings = getattr(args, "max_findings", None)
+    if max_findings is None:
+        max_findings = config.get("max_findings")
     truncated = False
     shown = findings
     if max_findings is not None and len(findings) > max_findings:
@@ -490,6 +500,7 @@ def cmd_init(args):
         "skip_rules": [],
         "only_rules": [],
         "rules": [],
+        "max_findings": None,
     }
 
     try:
