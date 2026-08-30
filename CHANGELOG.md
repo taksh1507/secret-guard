@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.8.0](https://github.com/taksh1507/secret-guard/compare/v0.7.1...v0.8.0) (2026-08-30)
+
+
+### Features
+
+* **cli:** add --reveal-prefix and --reveal-suffix for partial masking ([#91](https://github.com/taksh1507/secret-guard/issues/91)) ([64a22a9](https://github.com/taksh1507/secret-guard/commit/64a22a9b5e91853f2a1f42761fdc71f01336ec00))
+* support max_findings in secret-guard.json config ([#90](https://github.com/taksh1507/secret-guard/issues/90)) ([a229c02](https://github.com/taksh1507/secret-guard/commit/a229c02f19b3b3ba24b6108293ab753c2afe7a32))
+
+
+### Documentation
+
+* rewrite README with clean formatting and LF line endings ([043b867](https://github.com/taksh1507/secret-guard/commit/043b867bfd7aaaa569440d1f3603051e7f473e8b))
+
+
+### Miscellaneous Chores
+
+* streak maintenance ([#87](https://github.com/taksh1507/secret-guard/issues/87)) ([b14a5dd](https://github.com/taksh1507/secret-guard/commit/b14a5dd9f226ea2c0ac265f282122421f26b5af4))
+
 ## [0.7.1](https://github.com/taksh1507/secret-guard/compare/v0.7.0...v0.7.1) (2026-08-28)
 
 
