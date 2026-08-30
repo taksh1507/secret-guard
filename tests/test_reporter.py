@@ -39,6 +39,24 @@ class MaskTest(unittest.TestCase):
         masked = mask("abcdefghijk")  # length 11
         self.assertEqual(masked, "abcdef" + "*" * 5)
 
+    def test_reveal_prefix(self):
+        self.assertEqual(mask("abcdefgh", reveal_prefix=4), "abcd****")
+        self.assertEqual(mask("abcde", reveal_prefix=4), "abcd*")
+
+    def test_reveal_suffix(self):
+        self.assertEqual(mask("abcdefgh", reveal_suffix=4), "****efgh")
+        self.assertEqual(mask("abcde", reveal_suffix=4), "*bcde")
+
+    def test_reveal_prefix_and_suffix(self):
+        self.assertEqual(mask("abcdefgh", reveal_prefix=2, reveal_suffix=2), "ab****gh")
+
+    def test_reveal_overlap_masks_completely(self):
+        # If pref_len + suff_len >= val_len, it should mask completely to prevent full leak
+        self.assertEqual(mask("abc", reveal_prefix=4), "***")
+        self.assertEqual(mask("abcd", reveal_prefix=4), "****")
+        self.assertEqual(mask("abcd", reveal_prefix=2, reveal_suffix=2), "****")
+        self.assertEqual(mask("abcde", reveal_prefix=3, reveal_suffix=3), "*****")
+
 
 class SummarizeTest(unittest.TestCase):
     def test_counts_by_severity(self):
@@ -111,6 +129,16 @@ class FormatConsoleTest(unittest.TestCase):
         self.assertLess(positions["a.py:1"], positions["a.py:9"])
         self.assertLess(positions["a.py:9"], positions["b.py:2"])
 
+    def test_reveal_prefix_option(self):
+        value = "ghp_secretvalue123"
+        report = format_console([finding(value=value)], ".", show_value=False, reveal_prefix=4)
+        self.assertIn("ghp_**************", report)
+
+    def test_reveal_suffix_option(self):
+        value = "ghp_secretvalue123"
+        report = format_console([finding(value=value)], ".", show_value=False, reveal_suffix=3)
+        self.assertIn("***************123", report)
+
 
 class FormatJsonTest(unittest.TestCase):
     def test_roundtrip_full_values(self):
@@ -130,6 +158,16 @@ class FormatJsonTest(unittest.TestCase):
         f["reveal"] = True
         payload = json.loads(format_json([f], "/repo"))
         self.assertEqual(payload["findings"][0]["value"], "GITHUB_TOKEN")
+
+    def test_reveal_prefix_json(self):
+        findings = [finding(severity="high", value="ghp_secretvalue123")]
+        payload = json.loads(format_json(findings, "/repo", show_value=False, reveal_prefix=4))
+        self.assertEqual(payload["findings"][0]["value"], "ghp_**************")
+
+    def test_reveal_suffix_json(self):
+        findings = [finding(severity="high", value="ghp_secretvalue123")]
+        payload = json.loads(format_json(findings, "/repo", show_value=False, reveal_suffix=3))
+        self.assertEqual(payload["findings"][0]["value"], "***************123")
 
     def test_valid_json(self):
         report = format_json([], ".")
