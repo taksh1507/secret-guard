@@ -4,8 +4,8 @@
 
 **Zero-dependency secret scanning for Python, CI/CD, and pre-commit hooks.**
 
-Detect hardcoded credentials - AWS keys, GitHub and Slack tokens, private keys,
-and dozens of other secrets - before they reach your repository history.
+Detect hardcoded credentials — AWS keys, GitHub and Slack tokens, private keys,
+and dozens of other secrets — before they reach your repository history.
 
 [![CI](https://github.com/taksh1507/secret-guard/actions/workflows/ci.yml/badge.svg)](https://github.com/taksh1507/secret-guard/actions/workflows/ci.yml)
 [![secret-guard scan](https://github.com/taksh1507/secret-guard/actions/workflows/scan.yml/badge.svg)](https://github.com/taksh1507/secret-guard/actions/workflows/scan.yml)
@@ -40,53 +40,18 @@ value.
 
 ## Features
 
-- **Zero runtime dependencies** - pure Python, no network calls, no build step.
-- **Masked by default** - secret values are redacted in both console and JSON
+- **Zero runtime dependencies** — pure Python, no network calls, no build step.
+- **Masked by default** — secret values are redacted in both console and JSON
   output; `--show-value` is an explicit opt-in for recovery and rotation work.
-- **Git-aware staged scanning** (`--staged`) - reads the git index blob rather
+- **Git-aware staged scanning** (`--staged`) — reads the git index blob rather
   than the working tree, so secrets that are staged but already deleted from
   disk are still detected.
-- **gitignore-aware** - skips `.git`, `node_modules`, `venv`, and anything your
+- **gitignore-aware** — skips `.git`, `node_modules`, `venv`, and anything your
   `.gitignore` already covers; repeatable `--exclude` handles the rest.
-- **Entropy detection** - flags high-entropy strings even when no rule matches.
-- **Configurable** - command-line flags, a checked-in `secret-guard.json`
+- **Entropy detection** — flags high-entropy strings even when no rule matches.
+- **Configurable** — command-line flags, a checked-in `secret-guard.json`
   config, custom rule manifests, baselines, and severity thresholds.
-- **Fast, single-file deployment** - works in CI with a single `pip install`.
-
-## Why secret-guard?
-
-There are many secret scanners. The following table compares secret-guard with
-several popular alternatives.
-
-| Capability | secret-guard | gitleaks | truffleHog | ggshield |
-| --- | :---: | :---: | :---: | :---: |
-| Zero runtime dependencies | Yes | No (Go binary) | No (Python deps) | No |
-| Runs in CI with one `pip install` | Yes | No (download binary) | No | No |
-| Regex + Shannon-entropy detection | Yes | Partial | Yes | Partial |
-| Values masked by default | Yes | Yes | Yes | Yes |
-| Staged git-index scanning | Yes | Partial | No | Yes |
-| `.env` files flagged by key name | Yes | No | No | No |
-| Native pre-commit hook install | Yes | Yes | No | Yes |
-| Rule-level controls (`--skip-rule`) | Yes | Yes | No | No |
-| Python 3.8+, no build step | Yes | No | Partial | Partial |
-
-What distinguishes secret-guard:
-
-1. **Zero dependencies and a zero build step** - a single
-   `pip install secret-guard-scan` is all that is required, in CI or on a
-   laptop. No Go toolchain, no Docker image, and no dependency tree to audit.
-2. **Values are masked by default** - including in `.env` files, where the key
-   name is reported but the value is never printed, even with `--show-value`.
-3. **Git-index-aware staged scanning** - the `--staged` flag scans the staged
-   blob (`git show :<path>`), so a secret that was staged and then deleted from
-   the working tree is still caught.
-4. **Explicit rule-level controls** - `--skip-rule` and `--only-rule` scope a
-   scan to exactly the rules that matter, and unknown rule identifiers fail the
-   scan instead of being silently ignored.
-
-For teams that already run gitleaks in CI, secret-guard is a natural
-complement: a zero-install first line of defense in pre-commit hooks and in any
-`pip install`-only CI job.
+- **Fast, single-file deployment** — works in CI with a single `pip install`.
 
 ## Installation
 
@@ -140,7 +105,7 @@ app.py:40     [MEDIUM  ] Credential Assignment: password = 'hunter 2'
 ```
 
 Values are masked by default. Use `--show-value` only when the full string is
-genuinely required - for example, to rotate a key that was just found.
+genuinely required — for example, to rotate a key that was just found.
 
 ## GitHub Action
 
@@ -313,20 +278,20 @@ never needs to contain the secret itself.
 
 ### Severity and exit codes
 
-- `0` - no secrets found, or all findings are below the `--severity` threshold
+- `0` — no secrets found, or all findings are below the `--severity` threshold
   (or `--help`/`--version` was used).
-- `1` - at least one secret meeting or exceeding the `--severity` threshold was
+- `1` — at least one secret meeting or exceeding the `--severity` threshold was
   detected (or a runtime error occurred).
-- `2` - CLI invocation error or configuration validation failure.
+- `2` — CLI invocation error or configuration validation failure.
 
 #### Severity levels
 
 The scanner assigns a severity to every finding:
 
-- `critical` - private cryptographic keys.
-- `high` - cloud API keys, SaaS tokens, OAuth tokens, and `.env` file credentials.
-- `medium` - variable assignments named like credentials, and generic secret keys.
-- `low` - high-entropy string detections.
+- `critical` — private cryptographic keys.
+- `high` — cloud API keys, SaaS tokens, OAuth tokens, and `.env` file credentials.
+- `medium` — variable assignments named like credentials, and generic secret keys.
+- `low` — high-entropy string detections.
 
 By default the severity threshold is `low`, so any finding fails the scan (exit
 code 1). To fail only on high or critical findings:
@@ -367,30 +332,12 @@ and a self-scan job) and runs GitGuardian on every pull request.
 
 ## Contributing
 
-Contributions of any size are welcome - new detection rules, false-positive
+Contributions of any size are welcome — new detection rules, false-positive
 reports, documentation, and editor integrations. Start with
 [CONTRIBUTING](CONTRIBUTING.md), review the [Contributors](CONTRIBUTORS.md)
 list, and read the [Code of Conduct](CODE_OF_CONDUCT.md). Please report security
 issues according to the [Security Policy](SECURITY.md).
 
-## Roadmap
-
-- [x] Pattern-based detection (cloud keys, tokens, private keys)
-- [x] Entropy-based heuristics
-- [x] `.env` support (`.env`, `.env.*`, `*.env`, `*.env.*`)
-- [x] Masked output by default
-- [x] Git-index-aware staged scanning
-- [x] Git hook and pre-commit integration
-- [x] Custom rule manifests
-- [x] Baseline / allowlist support
-- [x] Severity thresholds
-- [x] OIDC trusted publishing to PyPI
-- [ ] Git history scanning
-- [ ] SARIF output for GitHub code scanning
-
 ## License
 
 [MIT](LICENSE)
-
- 
- 
