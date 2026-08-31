@@ -52,6 +52,7 @@ class Scanner:
         self.skip_rules = set(skip_rules or [])
         self.only_rules = set(only_rules or []) or None
         self.custom_rules = list(custom_rules or [])
+        self._exclusions = DEFAULT_EXCLUDES | self.extra_excludes
         self._spec = None
         self._load_gitignore()
 
@@ -70,9 +71,8 @@ class Scanner:
         if self._spec is not None and self._spec.match_file(rel_path):
             return True
         parts = rel_path.replace(os.sep, "/").split("/")
-        exclusions = DEFAULT_EXCLUDES | self.extra_excludes
         for part in parts:
-            if part in exclusions:
+            if part in self._exclusions:
                 return True
         return False
 
