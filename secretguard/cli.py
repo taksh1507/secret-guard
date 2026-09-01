@@ -199,6 +199,10 @@ def build_parser():
         help="Disable colored console output.",
     )
     scan.add_argument(
+        "--quiet", action="store_true",
+        help="Suppress all scan output; only the exit code is set.",
+    )
+    scan.add_argument(
         "--staged", action="store_true",
         help="Scan only files staged in git.",
     )
@@ -484,31 +488,35 @@ def cmd_scan(args):
         truncated = True
         shown = findings[:max_findings]
 
-    if args.csv:
-        print(
-            format_csv(
-                shown, os.path.abspath(args.path), show_value=args.show_value,
-                truncated=truncated, total_findings=len(findings),
-                reveal_prefix=args.reveal_prefix, reveal_suffix=args.reveal_suffix,
+    if not args.quiet:
+        if args.csv:
+            print(
+                format_csv(
+                    shown, os.path.abspath(args.path), show_value=args.show_value,
+                    truncated=truncated, total_findings=len(findings),
+                    reveal_prefix=args.reveal_prefix,
+                    reveal_suffix=args.reveal_suffix,
+                )
             )
-        )
-    elif args.json:
-        print(
-            format_json(
-                shown, os.path.abspath(args.path), show_value=args.show_value,
-                truncated=truncated, total_findings=len(findings),
-                reveal_prefix=args.reveal_prefix, reveal_suffix=args.reveal_suffix,
+        elif args.json:
+            print(
+                format_json(
+                    shown, os.path.abspath(args.path), show_value=args.show_value,
+                    truncated=truncated, total_findings=len(findings),
+                    reveal_prefix=args.reveal_prefix,
+                    reveal_suffix=args.reveal_suffix,
+                )
             )
-        )
-    else:
-        color = False if args.no_color else None
-        print(
-            format_console(
-                shown, args.path, show_value=args.show_value, color=color,
-                truncated=truncated, total_findings=len(findings),
-                reveal_prefix=args.reveal_prefix, reveal_suffix=args.reveal_suffix,
+        else:
+            color = False if args.no_color else None
+            print(
+                format_console(
+                    shown, args.path, show_value=args.show_value, color=color,
+                    truncated=truncated, total_findings=len(findings),
+                    reveal_prefix=args.reveal_prefix,
+                    reveal_suffix=args.reveal_suffix,
+                )
             )
-        )
     return 1 if has_blocking_findings(findings, severity_threshold) else 0
 
 
