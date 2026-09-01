@@ -8,7 +8,7 @@ import subprocess
 import sys
 
 from . import __version__
-from .reporter import format_console, format_json
+from .reporter import format_console, format_csv, format_json
 from .rules import (
     RULES,
     SPECIAL_RULES,
@@ -166,8 +166,12 @@ def build_parser():
         "--no-entropy", action="store_true",
         help="Disable high-entropy string detection.",
     )
-    scan.add_argument(
+    out_group = scan.add_mutually_exclusive_group()
+    out_group.add_argument(
         "--json", action="store_true", help="Output JSON instead of a report.",
+    )
+    out_group.add_argument(
+        "--csv", action="store_true", help="Output CSV instead of a report.",
     )
     scan.add_argument(
         "--show-value", action="store_true",
@@ -480,7 +484,15 @@ def cmd_scan(args):
         truncated = True
         shown = findings[:max_findings]
 
-    if args.json:
+    if args.csv:
+        print(
+            format_csv(
+                shown, os.path.abspath(args.path), show_value=args.show_value,
+                truncated=truncated, total_findings=len(findings),
+                reveal_prefix=args.reveal_prefix, reveal_suffix=args.reveal_suffix,
+            )
+        )
+    elif args.json:
         print(
             format_json(
                 shown, os.path.abspath(args.path), show_value=args.show_value,

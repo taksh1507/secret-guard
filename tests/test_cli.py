@@ -1,6 +1,8 @@
 """End-to-end tests for the secret-guard command line."""
 
+import csv
 import hashlib
+import io
 import json
 import os
 import shutil
@@ -150,6 +152,45 @@ class CliTest(unittest.TestCase):
             result = self.run_cli(tmp, "scan", "--json", "--show-value", ".")
             self.assertEqual(result.returncode, 1)
             self.assertIn(SECRET, result.stdout)
+
+    def test_scan_csv_emits_parseable_output(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "secret.py").write_text(
+                f"TOKEN = '{SECRET}'", encoding="utf-8"
+            )
+            result = self.run_cli(tmp, "scan", "--csv", ".")
+            self.assertEqual(result.returncode, 1)
+            rows = list(csv.reader(io.StringIO(result.stdout)))
+            self.assertEqual(
+                rows[0],
+                ["path", "line", "severity", "rule", "rule_id", "value", "description"],
+            )
+            self.assertGreaterEqual(len(rows), 2)  # header + findings
+
+    def test_scan_csv_masks_values_by_default(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "secret.py").write_text(
+                f"TOKEN = '{SECRET}'", encoding="utf-8"
+            )
+            result = self.run_cli(tmp, "scan", "--csv", ".")
+            self.assertEqual(result.returncode, 1)
+            self.assertNotIn(SECRET, result.stdout)
+
+    def test_scan_csv_show_value_exposes_full_value(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "secret.py").write_text(
+                f"TOKEN = '{SECRET}'", encoding="utf-8"
+            )
+            result = self.run_cli(tmp, "scan", "--csv", "--show-value", ".")
+            self.assertEqual(result.returncode, 1)
+            self.assertIn(SECRET, result.stdout)
+
+    def test_scan_csv_and_json_are_mutually_exclusive(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "main.py").write_text("print('clean')\n", encoding="utf-8")
+            result = self.run_cli(tmp, "scan", "--json", "--csv", ".")
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("not allowed with argument", result.stderr)
 
     def test_help_lists_commands(self):
         result = self.run_cli(str(PROJECT_ROOT), "--help")

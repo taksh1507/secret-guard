@@ -1,5 +1,7 @@
-"""Console and JSON reporting for findings."""
+"""Console, JSON, and CSV reporting for findings."""
 
+import csv
+import io
 import json
 import os
 import sys
@@ -156,3 +158,48 @@ def format_json(
         payload["truncated"] = True
         payload["total_findings"] = total_findings
     return json.dumps(payload, indent=2)
+
+
+CSV_COLUMNS = ("path", "line", "severity", "rule", "rule_id", "value", "description")
+
+
+def format_csv(
+    findings,
+    root,
+    show_value=False,
+    truncated=False,
+    total_findings=None,
+    reveal_prefix=None,
+    reveal_suffix=None,
+):
+    """Render findings as a CSV table with a header row and one row per finding.
+
+    Values are masked unless show_value is set or the finding opts in to
+    reveal, matching format_json. Any tricky characters (commas, quotes,
+    newlines) in secret values are quoted/escaped by the csv module.
+    """
+
+    ordered = sorted(findings, key=lambda f: (f["path"], f["line"], f["rule"]))
+    buf = io.StringIO()
+    writer = csv.writer(buf, lineterminator="\n")
+    writer.writerow(CSV_COLUMNS)
+    for finding in ordered:
+        value = finding["value"][:]
+        if not show_value and not finding.get("reveal"):
+            value = mask(
+                value,
+                reveal_prefix=reveal_prefix,
+                reveal_suffix=reveal_suffix,
+            )
+        writer.writerow(
+            [
+                finding["path"],
+                finding["line"],
+                finding["severity"],
+                finding["rule"],
+                finding["rule_id"],
+                value,
+                finding["description"],
+            ]
+        )
+    return buf.getvalue()

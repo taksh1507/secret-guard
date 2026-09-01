@@ -1,10 +1,18 @@
-"""Unit tests for console and JSON reporting."""
+"""Unit tests for console, JSON, and CSV reporting."""
 
+import csv
+import io
 import json
 import re
 import unittest
 
-from secretguard.reporter import format_console, format_json, mask, summarize
+from secretguard.reporter import (
+    format_console,
+    format_csv,
+    format_json,
+    mask,
+    summarize,
+)
 
 
 def finding(
@@ -18,6 +26,7 @@ def finding(
         "path": path,
         "value": value,
         "rule": rule,
+        "rule_id": "github-token",
         "severity": severity,
         "line": line,
         "description": "test",
@@ -225,6 +234,74 @@ class JsonSchemaTest(unittest.TestCase):
         first = format_json(list(findings), ".")
         second = format_json(list(reversed(findings)), ".")
         self.assertEqual(first, second)
+
+
+class FormatCsvTest(unittest.TestCase):
+    def _rows(self, text):
+        return list(csv.reader(io.StringIO(text)))
+
+    def test_header_row(self):
+        rows = self._rows(format_csv([], "."))
+        self.assertEqual(
+            rows[0],
+            ["path", "line", "severity", "rule", "rule_id", "value", "description"],
+        )
+
+    def test_one_row_per_finding(self):
+        rows = self._rows(
+            format_csv([finding(), finding(severity="low")], ".", show_value=True)
+        )
+        self.assertEqual(len(rows), 3)  # header + 2 findings
+
+    def test_values_masked_by_default(self):
+        value = "ghp_secretvalue123"
+        rows = self._rows(format_csv([finding(value=value)], ".", show_value=False))
+        self.assertNotIn("secretvalue", rows[1][5])
+
+    def test_full_values_printed_when_requested(self):
+        value = "ghp_secretvalue123"
+        rows = self._rows(format_csv([finding(value=value)], ".", show_value=True))
+        self.assertEqual(rows[1][5], value)
+
+    def test_reveal_findings_keep_value(self):
+        f = finding(value="GITHUB_TOKEN")
+        f["reveal"] = True
+        rows = self._rows(format_csv([f], ".", show_value=False))
+        self.assertEqual(rows[1][5], "GITHUB_TOKEN")
+
+    def test_reveal_prefix(self):
+        value = "ghp_secretvalue123"
+        rows = self._rows(
+            format_csv([finding(value=value)], ".", show_value=False, reveal_prefix=4)
+        )
+        self.assertEqual(rows[1][5], "ghp_**************")
+
+    def test_reveal_suffix(self):
+        value = "ghp_secretvalue123"
+        rows = self._rows(
+            format_csv([finding(value=value)], ".", show_value=False, reveal_suffix=3)
+        )
+        self.assertEqual(rows[1][5], "***************123")
+
+    def test_quotes_and_commas_escaped(self):
+        f = finding(value='a"b,c\nline2')
+        f["description"] = "has,comma"
+        text = format_csv([f], ".", show_value=True)
+        rows = self._rows(text)
+        self.assertEqual(rows[1][5], 'a"b,c\nline2')
+        self.assertEqual(rows[1][6], "has,comma")
+        self.assertEqual(len(rows), 2)  # newline inside a field is not a new row
+
+    def test_sorted_by_path_then_line(self):
+        findings = [
+            finding(path="b.py", line=2),
+            finding(path="a.py", line=9),
+            finding(path="a.py", line=1),
+        ]
+        rows = self._rows(format_csv(findings, ".", show_value=True))
+        data = rows[1:]
+        self.assertEqual([(r[0], r[1]) for r in data],
+                         [("a.py", "1"), ("a.py", "9"), ("b.py", "2")])
 
 
 if __name__ == "__main__":
