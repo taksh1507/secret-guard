@@ -192,6 +192,32 @@ class CliTest(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("not allowed with argument", result.stderr)
 
+    def test_scan_quiet_suppresses_output_but_sets_exit_code(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "secret.py").write_text(
+                f"TOKEN = '{SECRET}'", encoding="utf-8"
+            )
+            result = self.run_cli(tmp, "scan", "--quiet", ".")
+            self.assertEqual(result.returncode, 1)
+            self.assertEqual(result.stdout, "")
+            self.assertEqual(result.stderr, "")
+
+    def test_scan_quiet_clean_returns_zero_with_no_output(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "main.py").write_text("print('clean')\n", encoding="utf-8")
+            result = self.run_cli(tmp, "scan", "--quiet", ".")
+            self.assertEqual(result.returncode, 0)
+            self.assertEqual(result.stdout, "")
+
+    def test_scan_quiet_with_json_suppresses_output(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "secret.py").write_text(
+                f"TOKEN = '{SECRET}'", encoding="utf-8"
+            )
+            result = self.run_cli(tmp, "scan", "--quiet", "--json", ".")
+            self.assertEqual(result.returncode, 1)
+            self.assertEqual(result.stdout, "")
+
     def test_help_lists_commands(self):
         result = self.run_cli(str(PROJECT_ROOT), "--help")
         self.assertEqual(result.returncode, 0)
