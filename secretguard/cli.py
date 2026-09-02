@@ -157,7 +157,10 @@ def build_parser():
     scan = subparsers.add_parser(
         "scan", help="Scan files for secrets."
     )
-    scan.add_argument("path", nargs="?", default=".", help="Path to scan (default: .)")
+    scan.add_argument(
+        "paths", nargs="*", default=["."], metavar="PATH",
+        help="Files or directories to scan (default: .).",
+    )
     scan.add_argument(
         "--exclude", action="append", default=[],
         metavar="DIR", help="Additional directory names to skip (repeatable).",
@@ -379,9 +382,9 @@ def _scan_staged(exclude, skip_rules, only_rules, custom_rules):
     return findings
 
 
-def _scan_path(args, exclude, skip_rules, only_rules, no_entropy, custom_rules):
+def _scan_path(path, exclude, skip_rules, only_rules, no_entropy, custom_rules):
     scanner = Scanner(
-        args.path, excludes=exclude, skip_rules=skip_rules, only_rules=only_rules,
+        path, excludes=exclude, skip_rules=skip_rules, only_rules=only_rules,
         custom_rules=custom_rules,
     )
     scanner.include_entropy = not no_entropy
@@ -395,9 +398,18 @@ def _run_scan(args, exclude, skip_rules, only_rules, no_entropy, custom_rules):
         )
     if args.staged:
         return _scan_staged(exclude, skip_rules, only_rules, custom_rules)
-    return _scan_path(
-        args, exclude, skip_rules, only_rules, no_entropy, custom_rules
-    )
+    multi = len(args.paths) > 1
+    findings = []
+    for path in args.paths:
+        for finding in _scan_path(
+            path, exclude, skip_rules, only_rules, no_entropy, custom_rules
+        ):
+            if multi:
+                finding["path"] = os.path.join(
+                    path, finding["path"]
+                ).replace(os.sep, "/")
+            findings.append(finding)
+    return findings
 
 def has_blocking_findings(findings, severity_threshold):
     """Return True if any finding meets or exceeds the severity threshold."""
@@ -434,7 +446,7 @@ def _load_custom_rules(args, config, config_file):
 
 
 def cmd_scan(args):
-    scan_path = "." if args.staged else args.path
+    scan_path = "." if (args.staged or args.stdin) else args.paths[0]
     config_file = find_config(scan_path)
     config = {}
     if config_file:
@@ -488,11 +500,17 @@ def cmd_scan(args):
         truncated = True
         shown = findings[:max_findings]
 
+    root = (
+        os.path.abspath(args.paths[0])
+        if len(args.paths) == 1
+        else os.getcwd()
+    )
+
     if not args.quiet:
         if args.csv:
             print(
                 format_csv(
-                    shown, os.path.abspath(args.path), show_value=args.show_value,
+                    shown, root, show_value=args.show_value,
                     truncated=truncated, total_findings=len(findings),
                     reveal_prefix=args.reveal_prefix,
                     reveal_suffix=args.reveal_suffix,
@@ -501,7 +519,7 @@ def cmd_scan(args):
         elif args.json:
             print(
                 format_json(
-                    shown, os.path.abspath(args.path), show_value=args.show_value,
+                    shown, root, show_value=args.show_value,
                     truncated=truncated, total_findings=len(findings),
                     reveal_prefix=args.reveal_prefix,
                     reveal_suffix=args.reveal_suffix,
@@ -511,7 +529,7 @@ def cmd_scan(args):
             color = False if args.no_color else None
             print(
                 format_console(
-                    shown, args.path, show_value=args.show_value, color=color,
+                    shown, root, show_value=args.show_value, color=color,
                     truncated=truncated, total_findings=len(findings),
                     reveal_prefix=args.reveal_prefix,
                     reveal_suffix=args.reveal_suffix,
