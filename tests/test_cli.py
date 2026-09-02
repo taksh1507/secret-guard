@@ -218,6 +218,55 @@ class CliTest(unittest.TestCase):
             self.assertEqual(result.returncode, 1)
             self.assertEqual(result.stdout, "")
 
+    def test_scan_multiple_paths_aggregates_findings(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            a = Path(tmp, "a")
+            b = Path(tmp, "b")
+            a.mkdir()
+            b.mkdir()
+            Path(a, "secret.py").write_text(
+                f"TOKEN = '{SECRET}'", encoding="utf-8"
+            )
+            Path(b, "secret2.py").write_text(
+                f"TOKEN = '{SECRET}'", encoding="utf-8"
+            )
+            result = self.run_cli(tmp, "scan", "--json", "a", "b")
+            self.assertEqual(result.returncode, 1)
+            payload = json.loads(result.stdout)
+            paths = {f["path"] for f in payload["findings"]}
+            self.assertIn("a/secret.py", paths)
+            self.assertIn("b/secret2.py", paths)
+
+    def test_scan_multiple_paths_mixed_clean_and_dirty(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            clean = Path(tmp, "clean")
+            dirty = Path(tmp, "dirty")
+            clean.mkdir()
+            dirty.mkdir()
+            Path(clean, "main.py").write_text("print('ok')\n", encoding="utf-8")
+            Path(dirty, "secret.py").write_text(
+                "password = 'somepassword'", encoding="utf-8"
+            )
+            result = self.run_cli(
+                tmp, "scan", "--only-rule", "credential-assignment",
+                "clean", "dirty",
+            )
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("dirty/secret.py", result.stdout)
+            self.assertNotIn("clean/main.py", result.stdout)
+
+    def test_scan_multiple_paths_all_clean_returns_zero(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            a = Path(tmp, "a")
+            b = Path(tmp, "b")
+            a.mkdir()
+            b.mkdir()
+            Path(a, "main.py").write_text("print('ok')\n", encoding="utf-8")
+            Path(b, "main.py").write_text("print('ok')\n", encoding="utf-8")
+            result = self.run_cli(tmp, "scan", "a", "b")
+            self.assertEqual(result.returncode, 0)
+            self.assertIn("0 total", result.stdout)
+
     def test_help_lists_commands(self):
         result = self.run_cli(str(PROJECT_ROOT), "--help")
         self.assertEqual(result.returncode, 0)

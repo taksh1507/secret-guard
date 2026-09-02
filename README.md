@@ -75,6 +75,9 @@ secret-guard scan
 # Scan a specific path
 secret-guard scan ./src
 
+# Scan several files and directories at once
+secret-guard scan ./src ./tests config.py
+
 # JSON output for CI and tooling
 secret-guard scan --json
 
@@ -157,17 +160,20 @@ docker run --rm -v "${PWD}:/code" ghcr.io/taksh1507/secret-guard:latest scan /co
 ## Usage
 
 ```
-secret-guard scan [path] [options]
+secret-guard scan [paths...] [options]
 
 positional arguments:
-  path                Path to scan (default: .)
+  paths               Files or directories to scan (default: .). Repeatable
+                      (e.g. `secret-guard scan src/ tests/ config.py`).
 
 options:
   --exclude DIR       Additional directory names to skip (repeatable)
   --no-entropy        Disable high-entropy string detection
   --json              Output findings as JSON
+  --csv               Output findings as CSV
   --show-value        Print full secret values (default masks them)
   --no-color          Disable colored console output
+  --quiet             Suppress all scan output; only the exit code is set
   --staged            Scan only files staged in git
   --baseline FILE     Suppress findings listed in a baseline file
   --severity LEVEL    Minimum severity to fail the scan (low, medium, high, critical)
