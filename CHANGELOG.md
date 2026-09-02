@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.9.0](https://github.com/taksh1507/secret-guard/compare/v0.8.0...v0.9.0) (2026-09-02)
+
+
+### Features
+
+* **cli:** add --csv output format for scan results ([77c461e](https://github.com/taksh1507/secret-guard/commit/77c461ea8b0a10e994ea9495927c9c1cb020ab50))
+* **cli:** add --quiet flag to suppress scan output ([f02637b](https://github.com/taksh1507/secret-guard/commit/f02637b5e522d6808d40300c4f913571a86388a1))
+* **cli:** allow scanning multiple paths with secret-guard scan ([a10c9f7](https://github.com/taksh1507/secret-guard/commit/a10c9f7d26293ab0061af0e61937f68ed8d66814))
+
+
+### Code Refactoring
+
+* **scanner:** precompute the exclusions set once in __init__ ([126f75f](https://github.com/taksh1507/secret-guard/commit/126f75f455bd6174228278a71e7838b3c1a743a3))
+
 ## [0.8.0](https://github.com/taksh1507/secret-guard/compare/v0.7.1...v0.8.0) (2026-08-30)
 
 
