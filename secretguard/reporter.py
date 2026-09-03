@@ -117,6 +117,61 @@ def format_console(
     return "\n".join(lines)
 
 
+def format_summary(
+    findings,
+    root,
+    show_value=True,
+    color=None,
+    truncated=False,
+    total_findings=None,
+    reveal_prefix=None,
+    reveal_suffix=None,
+):
+    """Render only the concise severity summary, omitting per-finding lines.
+
+    Useful for CI logs where the full report is noise but an aggregate count
+    is still wanted. Mirrors the trailing summary line of format_console.
+    """
+
+    color = should_color(force=color)
+    summary = summarize(findings)
+    if truncated:
+        summary["truncated"] = total_findings - len(findings)
+        summary_line = (
+            "{critical} critical, {high} high, {medium} medium, {low} low — "
+            "{total} total (showing {shown} of {total_findings}; "
+            "{truncated} truncated)"
+        ).format(
+            critical=summary["critical"],
+            high=summary["high"],
+            medium=summary["medium"],
+            low=summary["low"],
+            total=summary["total"],
+            shown=len(findings),
+            total_findings=total_findings,
+            truncated=summary["truncated"],
+        )
+    else:
+        summary_line = (
+            "{critical} critical, {high} high, {medium} medium, {low} low — "
+            "{total} total"
+        ).format(
+            critical=summary["critical"],
+            high=summary["high"],
+            medium=summary["medium"],
+            low=summary["low"],
+            total=summary["total"],
+        )
+    if color:
+        summary_line = (
+            "\033[31m{critical}\033[0m critical, "
+            "\033[31m{high}\033[0m high, "
+            "\033[33m{medium}\033[0m medium, "
+            "\033[36m{low}\033[0m low — {total} total"
+        ).format(**summary)
+    return summary_line
+
+
 def summarize(findings):
     total = len(findings)
     counts = {"critical": 0, "high": 0, "medium": 0, "low": 0}
