@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.0](https://github.com/taksh1507/secret-guard/compare/v0.9.0...v0.10.0) (2026-09-03)
+
+
+### Features
+
+* **cli:** add --summary output to print only the severity summary ([37fa6bf](https://github.com/taksh1507/secret-guard/commit/37fa6bf3deb1f0c76cdc8ee9c969ce0bc2c2a9dd))
+
 ## [0.9.0](https://github.com/taksh1507/secret-guard/compare/v0.8.0...v0.9.0) (2026-09-02)
 
 
