@@ -171,6 +171,8 @@ options:
   --no-entropy        Disable high-entropy string detection
   --json              Output findings as JSON
   --csv               Output findings as CSV
+  --summary           Print only the severity summary instead of the
+                      detailed report
   --show-value        Print full secret values (default masks them)
   --no-color          Disable colored console output
   --quiet             Suppress all scan output; only the exit code is set

@@ -10,6 +10,7 @@ from secretguard.reporter import (
     format_console,
     format_csv,
     format_json,
+    format_summary,
     mask,
     summarize,
 )
@@ -89,6 +90,48 @@ class SummarizeTest(unittest.TestCase):
         self.assertEqual(
             sum(summary[k] for k in ("critical", "high", "medium", "low")), 0
         )
+
+
+class FormatSummaryTest(unittest.TestCase):
+    def test_clean_prints_zero_counts(self):
+        line = format_summary([], ".", color=False)
+        self.assertEqual(line, "0 critical, 0 high, 0 medium, 0 low — 0 total")
+
+    def test_counts_by_severity(self):
+        findings = [
+            finding(severity="critical"),
+            finding(severity="high", value="abcd1234"),
+            finding(severity="medium", value="abcdef12"),
+            finding(severity="low", value="a"),
+        ]
+        line = format_summary(findings, ".", color=False)
+        self.assertEqual(
+            line, "1 critical, 1 high, 1 medium, 1 low — 4 total"
+        )
+
+    def test_masks_values(self):
+        line = format_summary(
+            [finding(value="ghp_supersecret")], ".", color=False
+        )
+        self.assertNotIn("ghp_supersecret", line)
+
+    def test_color_true_when_requested(self):
+        line = format_summary([finding()], ".", color=True)
+        self.assertIn("\033[", line)
+
+    def test_color_false_is_plain(self):
+        line = format_summary([finding()], ".", color=False)
+        self.assertNotIn("\033[", line)
+
+    def test_truncated_reports_totals(self):
+        findings = [
+            finding(severity="high"),
+            finding(severity="high", value="abcd1234"),
+        ]
+        line = format_summary(
+            findings, ".", color=False, truncated=True, total_findings=5
+        )
+        self.assertIn("2 total (showing 2 of 5; 3 truncated)", line)
 
 
 class FormatConsoleTest(unittest.TestCase):

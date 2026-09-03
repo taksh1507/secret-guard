@@ -8,7 +8,12 @@ import subprocess
 import sys
 
 from . import __version__
-from .reporter import format_console, format_csv, format_json
+from .reporter import (
+    format_console,
+    format_csv,
+    format_json,
+    format_summary,
+)
 from .rules import (
     RULES,
     SPECIAL_RULES,
@@ -175,6 +180,10 @@ def build_parser():
     )
     out_group.add_argument(
         "--csv", action="store_true", help="Output CSV instead of a report.",
+    )
+    out_group.add_argument(
+        "--summary", action="store_true",
+        help="Print only the severity summary instead of the full report.",
     )
     scan.add_argument(
         "--show-value", action="store_true",
@@ -507,7 +516,17 @@ def cmd_scan(args):
     )
 
     if not args.quiet:
-        if args.csv:
+        if args.summary:
+            color = False if args.no_color else None
+            print(
+                format_summary(
+                    shown, root, show_value=args.show_value, color=color,
+                    truncated=truncated, total_findings=len(findings),
+                    reveal_prefix=args.reveal_prefix,
+                    reveal_suffix=args.reveal_suffix,
+                )
+            )
+        elif args.csv:
             print(
                 format_csv(
                     shown, root, show_value=args.show_value,
