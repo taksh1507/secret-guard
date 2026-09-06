@@ -20,7 +20,7 @@ and dozens of other secrets — before they reach your repository history.
 
 ## Overview
 
-secret-guard scans source files for hardcoded credentials using **30 regex
+secret-guard scans source files for hardcoded credentials using **32 regex
 rules** combined with **Shannon-entropy detection**, and reports each finding
 with a severity level and a **masked** value. By default, secret values are
 never printed.
@@ -28,10 +28,10 @@ never printed.
 | Category | Detection rules |
 | --- | --- |
 | Cloud / SaaS | AWS Access Key IDs, AWS temporary/assigned keys, AWS dashed keys, Google API Keys, Stripe secret keys, SendGrid and Twilio API keys |
-| Tokens | GitHub PATs (classic and fine-grained), Slack tokens and webhooks, OpenAI, Anthropic, Discord, Square, HubSpot, GitLab, Hugging Face, npm, PyPI, DigitalOcean tokens |
+| Tokens | GitHub PATs (classic and fine-grained), Slack tokens and webhooks, OpenAI, Anthropic, Discord, Square, HubSpot, GitLab, Hugging Face, npm, PyPI, DigitalOcean tokens, OAuth2/Auth bearer tokens |
 | Databases | PostgreSQL and MongoDB connection URIs with embedded credentials |
 | Key material | RSA / EC / DSA / OpenSSH / PGP private keys (`critical` severity) |
-| Heuristics | Generic secret keys, credential assignments, JWT tokens, high-entropy strings |
+| Heuristics | Generic secret keys (including `sk-` prefixed keys), credential assignments, JWT tokens, high-entropy strings |
 
 In addition to pattern matching, secret-guard identifies **`.env` files** that
 assign values to secret-looking variable names (`.env`, `.env.local`,
