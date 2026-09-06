@@ -10,6 +10,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -217,6 +218,56 @@ class CliTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             Path(tmp, "main.py").write_text("print('clean')\n", encoding="utf-8")
             result = self.run_cli(tmp, "scan", "--json", "--csv", ".")
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("not allowed with argument", result.stderr)
+
+    def test_scan_xml_emits_well_formed_output(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "secret.py").write_text(
+                f"TOKEN = '{SECRET}'", encoding="utf-8"
+            )
+            result = self.run_cli(tmp, "scan", "--xml", ".")
+            self.assertEqual(result.returncode, 1)
+            root = ET.fromstring(result.stdout)
+            self.assertEqual(root.tag, "testsuites")
+            self.assertGreaterEqual(len(root.findall(".//testcase")), 1)
+            self.assertNotIn(SECRET, result.stdout)
+
+    def test_scan_xml_show_value_exposes_full_value(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "secret.py").write_text(
+                f"TOKEN = '{SECRET}'", encoding="utf-8"
+            )
+            result = self.run_cli(tmp, "scan", "--xml", "--show-value", ".")
+            self.assertEqual(result.returncode, 1)
+            self.assertIn(SECRET, result.stdout)
+            ET.fromstring(result.stdout)
+
+    def test_scan_html_emits_report(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "secret.py").write_text(
+                f"TOKEN = '{SECRET}'", encoding="utf-8"
+            )
+            result = self.run_cli(tmp, "scan", "--html", ".")
+            self.assertEqual(result.returncode, 1)
+            self.assertTrue(result.stdout.lstrip().startswith("<!DOCTYPE html>"))
+            self.assertNotIn(SECRET, result.stdout)
+
+    def test_scan_format_flag_selects_format(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "main.py").write_text("print('clean')\n", encoding="utf-8")
+            xml = self.run_cli(tmp, "scan", "--format", "xml", ".")
+            self.assertEqual(xml.returncode, 0)
+            ET.fromstring(xml.stdout)
+            html = self.run_cli(tmp, "scan", "--format", "html", ".")
+            self.assertTrue(html.stdout.lstrip().startswith("<!DOCTYPE html>"))
+            text = self.run_cli(tmp, "scan", "--format", "text", ".")
+            self.assertIn("0 total", text.stdout)
+
+    def test_scan_format_and_flag_are_mutually_exclusive(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "main.py").write_text("print('clean')\n", encoding="utf-8")
+            result = self.run_cli(tmp, "scan", "--format", "xml", "--json", ".")
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("not allowed with argument", result.stderr)
 

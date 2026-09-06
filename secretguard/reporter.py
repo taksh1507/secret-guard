@@ -1,10 +1,12 @@
-"""Console, JSON, and CSV reporting for findings."""
+"""Console, JSON, CSV, XML, and HTML reporting for findings."""
 
 import csv
+import html
 import io
 import json
 import os
 import sys
+import xml.etree.ElementTree as ET
 
 SEVERITY_COLORS = {
     "critical": "\033[31;1m",  # bright red
@@ -258,3 +260,178 @@ def format_csv(
             ]
         )
     return buf.getvalue()
+
+
+def _masked_value(finding, show_value, reveal_prefix, reveal_suffix):
+    """The value to emit for a finding, masked unless revealed."""
+    value = finding["value"][:]
+    if not show_value and not finding.get("reveal"):
+        value = mask(
+            value, reveal_prefix=reveal_prefix, reveal_suffix=reveal_suffix
+        )
+    return value
+
+
+def format_xml(
+    findings,
+    root,
+    show_value=False,
+    truncated=False,
+    total_findings=None,
+    reveal_prefix=None,
+    reveal_suffix=None,
+):
+    """Render findings as a JUnit-style XML report.
+
+    Each finding becomes a failing ``testcase`` whose attributes carry every
+    finding field (path, line, severity, rule, rule_id, and the masked value)
+    plus a ``failure`` node with the description. Values are masked unless
+    show_value is set, matching format_json / format_csv.
+    """
+
+    ordered = sorted(findings, key=lambda f: (f["path"], f["line"], f["rule"]))
+    count = len(ordered)
+    suites = ET.Element(
+        "testsuites",
+        {
+            "name": "secret-guard",
+            "tests": str(count),
+            "failures": str(count),
+            "errors": "0",
+            "time": "0",
+        },
+    )
+    suite = ET.SubElement(
+        suites,
+        "testsuite",
+        {
+            "name": "secret-guard scan",
+            "tests": str(count),
+            "failures": str(count),
+            "errors": "0",
+            "skipped": "0",
+            "time": "0",
+        },
+    )
+    if truncated:
+        suite.set("truncated", "true")
+        suite.set("total_findings", str(total_findings))
+    for finding in ordered:
+        value = _masked_value(finding, show_value, reveal_prefix, reveal_suffix)
+        testcase = ET.SubElement(
+            suite,
+            "testcase",
+            {
+                "name": value,
+                "classname": "{}:{}".format(finding["path"], finding["line"]),
+                "time": "0",
+                "path": finding["path"],
+                "line": str(finding["line"]),
+                "severity": finding["severity"],
+                "rule": finding["rule"],
+                "rule_id": finding["rule_id"],
+            },
+        )
+        failure = ET.SubElement(
+            testcase,
+            "failure",
+            {"type": finding["severity"], "message": finding["description"]},
+        )
+        failure.text = value
+    header = '<?xml version="1.0" encoding="UTF-8"?>\n'
+    return header + ET.tostring(suites, encoding="unicode")
+
+
+def format_html(
+    findings,
+    root,
+    show_value=False,
+    truncated=False,
+    total_findings=None,
+    reveal_prefix=None,
+    reveal_suffix=None,
+):
+    """Render findings as a self-contained HTML report.
+
+    The output inlines every style so the report can be saved or emailed and
+    rendered anywhere. All finding fields are shown and values are masked
+    unless show_value is set.
+    """
+
+    ordered = sorted(findings, key=lambda f: (f["path"], f["line"], f["rule"]))
+    summary = summarize(findings)
+    count = len(ordered)
+
+    def esc(text):
+        return html.escape(str(text))
+
+    rows = []
+    for finding in ordered:
+        severity = finding["severity"]
+        rows.append(
+            "<tr>"
+            "<td>{path}</td>"
+            "<td>{line}</td>"
+            "<td class=\"sev-{sev}\">{sev}</td>"
+            "<td>{rule}</td>"
+            "<td>{rule_id}</td>"
+            "<td><code>{value}</code></td>"
+            "<td>{desc}</td>"
+            "</tr>".format(
+                path=esc(finding["path"]),
+                line=esc(finding["line"]),
+                sev=esc(severity),
+                rule=esc(finding["rule"]),
+                rule_id=esc(finding["rule_id"]),
+                value=esc(
+                    _masked_value(finding, show_value, reveal_prefix, reveal_suffix)
+                ),
+                desc=esc(finding["description"]),
+            )
+        )
+    truncation_note = ""
+    if truncated:
+        truncation_note = (
+            f"<p><strong>Note:</strong> showing {count} of "
+            f"{esc(total_findings)} findings "
+            f"({esc(total_findings - count)} truncated).</p>"
+        )
+    return (
+        "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n"
+        "<meta charset=\"utf-8\">\n"
+        "<title>secret-guard scan report</title>\n"
+        "<style>\n"
+        "body {{ font-family: -apple-system, Segoe UI, Roboto, "
+        "Helvetica, Arial, sans-serif; }}\n"
+        "table {{ border-collapse: collapse; width: 100%; }}\n"
+        "th, td {{ border: 1px solid #ddd; padding: 6px 10px; "
+        "text-align: left; }}\n"
+        "th {{ background: #f5f5f5; }}\n"
+        "code {{ background: #f5f5f5; padding: 1px 4px; border-radius: 3px; }}\n"
+        ".sev-critical {{ color: #b60205; font-weight: bold; }}\n"
+        ".sev-high {{ color: #d93f0b; }}\n"
+        ".sev-medium {{ color: #b08800; }}\n"
+        ".sev-low {{ color: #0969da; }}\n"
+        "</style>\n"
+        "</head>\n<body>\n"
+        "<h1>secret-guard scan report</h1>\n"
+        "<p>Scanned path: <code>{root}</code></p>\n"
+        "<p><strong>{total} finding(s):</strong> "
+        "{critical} critical, {high} high, {medium} medium, {low} low.</p>\n"
+        "{truncation_note}"
+        "<h2>Findings</h2>\n"
+        "<table>\n"
+        "<thead><tr><th>Path</th><th>Line</th><th>Severity</th><th>Rule</th>"
+        "<th>Rule ID</th><th>Value</th><th>Description</th></tr></thead>\n"
+        "<tbody>\n{rows}\n</tbody>\n</table>\n"
+        "</body>\n</html>\n"
+    ).format(
+        root=esc(root),
+        total=esc(summary["total"]),
+        critical=esc(summary["critical"]),
+        high=esc(summary["high"]),
+        medium=esc(summary["medium"]),
+        low=esc(summary["low"]),
+        truncation_note=truncation_note,
+        rows="\n".join(rows),
+    )
