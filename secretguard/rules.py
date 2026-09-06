@@ -209,6 +209,18 @@ RULES = [
         description="JSON Web Token.",
     ),
     _r(
+        r"(?i)\bbearer[ :][ \t]*[A-Za-z0-9._~+/=-]{20,}\b",
+        "Bearer Token",
+        severity="high",
+        description="OAuth2 / HTTP Authorization bearer token.",
+    ),
+    _r(
+        r"(?i)\bsk-[A-Za-z0-9_-]{20,}",
+        "Generic Secret Key (sk-)",
+        severity="high",
+        description="Suspicious sk- prefixed secret key.",
+    ),
+    _r(
         r"(?i)sq0atp-[0-9A-Za-z_-]{22,}",
         "Square Access Token",
         severity="high",

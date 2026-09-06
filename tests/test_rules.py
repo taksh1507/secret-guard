@@ -255,6 +255,26 @@ class RuleDetectionTest(unittest.TestCase):
         )
         self.assertIn("JWT Token", rule_names(text))
 
+    def test_jwt_non_json_three_part_not_flagged(self):
+        self.assertNotIn("JWT Token", rule_names("aaa.bbb.ccc"))
+
+    def test_bearer_token(self):
+        text = "Authorization: Bearer abcdefghijklmnopqrstuvwxyz1234567890"
+        self.assertIn("Bearer Token", rule_names(text))
+
+    def test_bearer_token_with_colon(self):
+        text = "credentials = 'Bearer: abcdefghijklmnopqrstuvwxyz123456789012'"
+        self.assertIn("Bearer Token", rule_names(text))
+
+    def test_bearer_short_word_not_flagged(self):
+        self.assertNotIn("Bearer Token", rule_names("Authorization: Bearer hellothere"))
+
+    def test_generic_secret_key_sk_prefix(self):
+        self.assertIn(
+            "Generic Secret Key (sk-)",
+            rule_names("token = sk-nonhexSecretValue1234567890"),
+        )
+
     def test_square_access_token(self):
         self.assertIn(
             "Square Access Token",
