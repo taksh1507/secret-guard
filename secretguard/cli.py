@@ -11,8 +11,10 @@ from . import __version__
 from .reporter import (
     format_console,
     format_csv,
+    format_html,
     format_json,
     format_summary,
+    format_xml,
 )
 from .rules import (
     RULES,
@@ -184,6 +186,20 @@ def build_parser():
     out_group.add_argument(
         "--summary", action="store_true",
         help="Print only the severity summary instead of the full report.",
+    )
+    out_group.add_argument(
+        "--xml", action="store_true",
+        help="Output a JUnit-style XML report instead of a console report.",
+    )
+    out_group.add_argument(
+        "--html", action="store_true",
+        help="Output a self-contained HTML report instead of a console report.",
+    )
+    out_group.add_argument(
+        "--format", choices=("text", "json", "csv", "summary", "xml", "html"),
+        default=None, metavar="FMT",
+        help="Output format: text, json, csv, summary, xml, or html "
+             "(aliases: --json, --csv, --summary, --xml, --html).",
     )
     scan.add_argument(
         "--show-value", action="store_true",
@@ -454,6 +470,45 @@ def _load_custom_rules(args, config, config_file):
     return custom
 
 
+def _output_format(args):
+    """Resolve the active output format from --format or the format flags."""
+
+    if args.format is not None:
+        return args.format
+    for flag in ("json", "csv", "summary", "xml", "html"):
+        if getattr(args, flag, False):
+            return flag
+    return "text"
+
+
+def _render_output(args, findings, shown, root, truncated):
+    """Print findings in the selected output format, honoring --quiet."""
+
+    if args.quiet:
+        return
+    kwargs = dict(
+        show_value=args.show_value,
+        truncated=truncated,
+        total_findings=len(findings),
+        reveal_prefix=args.reveal_prefix,
+        reveal_suffix=args.reveal_suffix,
+    )
+    color = False if args.no_color else None
+    out_format = _output_format(args)
+    if out_format == "summary":
+        print(format_summary(shown, root, color=color, **kwargs))
+    elif out_format == "csv":
+        print(format_csv(shown, root, **kwargs))
+    elif out_format == "json":
+        print(format_json(shown, root, **kwargs))
+    elif out_format == "xml":
+        print(format_xml(shown, root, **kwargs))
+    elif out_format == "html":
+        print(format_html(shown, root, **kwargs))
+    else:
+        print(format_console(shown, root, color=color, **kwargs))
+
+
 def cmd_scan(args):
     scan_path = "." if (args.staged or args.stdin) else args.paths[0]
     config_file = find_config(scan_path)
@@ -515,45 +570,7 @@ def cmd_scan(args):
         else os.getcwd()
     )
 
-    if not args.quiet:
-        if args.summary:
-            color = False if args.no_color else None
-            print(
-                format_summary(
-                    shown, root, show_value=args.show_value, color=color,
-                    truncated=truncated, total_findings=len(findings),
-                    reveal_prefix=args.reveal_prefix,
-                    reveal_suffix=args.reveal_suffix,
-                )
-            )
-        elif args.csv:
-            print(
-                format_csv(
-                    shown, root, show_value=args.show_value,
-                    truncated=truncated, total_findings=len(findings),
-                    reveal_prefix=args.reveal_prefix,
-                    reveal_suffix=args.reveal_suffix,
-                )
-            )
-        elif args.json:
-            print(
-                format_json(
-                    shown, root, show_value=args.show_value,
-                    truncated=truncated, total_findings=len(findings),
-                    reveal_prefix=args.reveal_prefix,
-                    reveal_suffix=args.reveal_suffix,
-                )
-            )
-        else:
-            color = False if args.no_color else None
-            print(
-                format_console(
-                    shown, root, show_value=args.show_value, color=color,
-                    truncated=truncated, total_findings=len(findings),
-                    reveal_prefix=args.reveal_prefix,
-                    reveal_suffix=args.reveal_suffix,
-                )
-            )
+    _render_output(args, findings, shown, root, truncated)
     return 1 if has_blocking_findings(findings, severity_threshold) else 0
 
 

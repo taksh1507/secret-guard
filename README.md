@@ -173,6 +173,10 @@ options:
   --csv               Output findings as CSV
   --summary           Print only the severity summary instead of the
                       detailed report
+  --xml               Output findings as a JUnit-style XML report
+  --html              Output findings as a self-contained HTML report
+  --format FMT        Output format: text, json, csv, summary, xml, or html
+                      (aliases: --json, --csv, --summary, --xml, --html)
   --show-value        Print full secret values (default masks them)
   --no-color          Disable colored console output
   --quiet             Suppress all scan output; only the exit code is set

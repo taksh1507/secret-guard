@@ -21,6 +21,11 @@ secret-guard scan [path] [options]
 | `--exclude DIR` | Skip additional directory names (repeatable) |
 | `--no-entropy` | Disable high-entropy string detection |
 | `--json` | Output findings as JSON |
+| `--csv` | Output findings as CSV |
+| `--summary` | Print only the severity summary instead of the full report |
+| `--xml` | Output findings as a JUnit-style XML report |
+| `--html` | Output findings as a self-contained HTML report |
+| `--format FMT` | Output format: `text`, `json`, `csv`, `summary`, `xml`, or `html` |
 | `--show-value` | Print full secret values (default masks them) |
 | `--reveal-prefix N` | Show first N characters of the masked secret |
 | `--reveal-suffix N` | Show last N characters of the masked secret |
@@ -58,6 +63,31 @@ commit — exactly what would otherwise be committed.
 ### `--json`
 
 Emits stable JSON. `--show-value` controls whether masked or raw values appear.
+
+### `--xml`
+
+Emits a JUnit-style XML report — each finding is a failing `<testcase>` whose
+attributes carry every finding field. Well-suited for CI dashboards that parse
+JUnit XML.
+
+### `--html`
+
+Emits a self-contained HTML report with all styles inlined, so it can be
+saved, emailed, or hosted as-is. Shows a severity summary and one table row
+per finding.
+
+### `--format`
+
+Selects the output format by name. It is an alias for the dedicated flags:
+
+```bash
+secret-guard scan . --format html    # same as --html
+secret-guard scan . --format xml     # same as --xml
+secret-guard scan . --format json    # same as --json
+```
+
+All output formats mask secret values by default; `--show-value` opts in to
+raw values.
 
 ### `--reveal-prefix` / `--reveal-suffix`
 

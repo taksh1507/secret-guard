@@ -5,12 +5,15 @@ import io
 import json
 import re
 import unittest
+import xml.etree.ElementTree as ET
 
 from secretguard.reporter import (
     format_console,
     format_csv,
+    format_html,
     format_json,
     format_summary,
+    format_xml,
     mask,
     summarize,
 )
@@ -345,6 +348,96 @@ class FormatCsvTest(unittest.TestCase):
         data = rows[1:]
         self.assertEqual([(r[0], r[1]) for r in data],
                          [("a.py", "1"), ("a.py", "9"), ("b.py", "2")])
+
+
+class FormatXmlTest(unittest.TestCase):
+    def _parse(self, text):
+        root = ET.fromstring(text)
+        return root, root.findall(".//testcase")
+
+    def test_well_formed_and_header(self):
+        text = format_xml([], ".")
+        self.assertTrue(text.startswith('<?xml version="1.0" encoding="UTF-8"?>'))
+        root, cases = self._parse(text)
+        self.assertEqual(root.tag, "testsuites")
+        self.assertEqual(cases, [])
+
+    def test_one_testcase_per_finding(self):
+        _, cases = self._parse(format_xml([finding(), finding(severity="low")], "."))
+        self.assertEqual(len(cases), 2)
+
+    def test_all_fields_present(self):
+        f = finding(path="a.py", line=7, severity="high", rule="GitHub Token")
+        _, cases = self._parse(format_xml([f], ".", show_value=True))
+        tc = cases[0]
+        self.assertEqual(tc.get("path"), "a.py")
+        self.assertEqual(tc.get("line"), "7")
+        self.assertEqual(tc.get("severity"), "high")
+        self.assertEqual(tc.get("rule"), "GitHub Token")
+        self.assertEqual(tc.get("rule_id"), "github-token")
+        self.assertEqual(tc.get("name"), "ghp_secret")
+        failure = tc.find("failure")
+        self.assertEqual(failure.get("message"), "test")
+
+    def test_values_masked_by_default(self):
+        value = "ghp_secretvalue123"
+        _, cases = self._parse(format_xml([finding(value=value)], "."))
+        self.assertNotIn("secretvalue", cases[0].get("name"))
+
+    def test_full_values_printed_when_requested(self):
+        value = "ghp_secretvalue123"
+        _, cases = self._parse(format_xml([finding(value=value)], ".", show_value=True))
+        self.assertEqual(cases[0].get("name"), value)
+        self.assertEqual(cases[0].find("failure").text, value)
+
+    def test_counts_match_findings(self):
+        text = format_xml([finding(), finding(severity="medium")], ".")
+        root, _ = self._parse(text)
+        self.assertEqual(root.get("tests"), "2")
+        self.assertEqual(root.get("failures"), "2")
+
+    def test_truncated_reports_totals(self):
+        text = format_xml([finding()], ".", truncated=True, total_findings=5)
+        root, _ = self._parse(text)
+        self.assertEqual(root.find("testsuite").get("truncated"), "true")
+        self.assertEqual(root.find("testsuite").get("total_findings"), "5")
+
+
+class FormatHtmlTest(unittest.TestCase):
+    def test_document_and_summary_present(self):
+        text = format_html([], ".")
+        self.assertTrue(text.startswith("<!DOCTYPE html>"))
+        self.assertIn("<html", text)
+        self.assertIn("secret-guard scan report", text)
+        self.assertIn("<h1>secret-guard scan report</h1>", text)
+
+    def test_one_row_per_finding(self):
+        text = format_html([finding(), finding(severity="low")], ".", show_value=True)
+        self.assertEqual(text.count("<tr>"), 3)  # header + 2 findings
+
+    def test_all_fields_present(self):
+        f = finding(path="a.py", line=7, severity="high", rule="GitHub Token")
+        text = format_html([f], ".", show_value=True)
+        self.assertIn('sev-high', text)
+        self.assertIn("github-token", text)
+        self.assertIn(">a.py<", text)
+        self.assertIn(">7<", text)
+        self.assertIn("ghp_secret", text)
+
+    def test_values_masked_by_default(self):
+        value = "ghp_secretvalue123"
+        text = format_html([finding(value=value)], ".")
+        self.assertNotIn("secretvalue", text)
+
+    def test_full_values_printed_when_requested(self):
+        value = "ghp_secretvalue123"
+        text = format_html([finding(value=value)], ".", show_value=True)
+        self.assertIn(value, text)
+
+    def test_summary_counts_line(self):
+        findings = [finding(severity="critical"), finding(severity="low")]
+        text = format_html(findings, ".")
+        self.assertIn("1 critical, 0 high, 0 medium, 1 low", text)
 
 
 if __name__ == "__main__":
