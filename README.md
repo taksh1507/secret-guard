@@ -342,9 +342,10 @@ and a self-scan job) and runs GitGuardian on every pull request.
 
 Contributions of any size are welcome — new detection rules, false-positive
 reports, documentation, and editor integrations. Start with
-[CONTRIBUTING](CONTRIBUTING.md), review the [Contributors](CONTRIBUTORS.md)
-list, and read the [Code of Conduct](CODE_OF_CONDUCT.md). Please report security
-issues according to the [Security Policy](SECURITY.md).
+[CONTRIBUTING](.github/CONTRIBUTING.md), review the
+[Contributors](docs/contributors.md) list, and read the
+[Code of Conduct](.github/CODE_OF_CONDUCT.md). Please report security issues
+according to the [Security Policy](.github/SECURITY.md).
 
 ## License
 

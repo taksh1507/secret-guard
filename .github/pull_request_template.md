@@ -14,7 +14,7 @@
 
 ## Checklist
 
-- [ ] I read [CONTRIBUTING](../blob/main/CONTRIBUTING.md)
+- [ ] I read [CONTRIBUTING](../blob/main/.github/CONTRIBUTING.md)
 - [ ] I added/updated tests for new behavior
 - [ ] No real secrets or tokens were used in code, docs, or fixtures
 - [ ] Code follows the project style (no formatting changes outside my scope)

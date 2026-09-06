@@ -46,6 +46,6 @@ https://github.com/taksh1507/secret-guard/issues?q=label%3A%22good+first+issue%2
 ## Recognition
 
 Every merged PR is credited in release notes. Please read our
-[Code of Conduct](https://github.com/taksh1507/secret-guard/blob/main/CODE_OF_CONDUCT.md)
+[Code of Conduct](https://github.com/taksh1507/secret-guard/blob/main/.github/CODE_OF_CONDUCT.md)
 and report security issues per our
-[Security Policy](https://github.com/taksh1507/secret-guard/blob/main/SECURITY.md).
+[Security Policy](https://github.com/taksh1507/secret-guard/blob/main/.github/SECURITY.md).
