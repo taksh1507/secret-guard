@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.10.0](https://github.com/taksh1507/secret-guard/compare/v0.9.0...v0.10.0) (2026-09-06)
+
+
+### Features
+
+* **cli:** add --summary output to print only the severity summary ([37fa6bf](https://github.com/taksh1507/secret-guard/commit/37fa6bf3deb1f0c76cdc8ee9c969ce0bc2c2a9dd))
+* **report:** add XML and HTML report output formats ([7604d04](https://github.com/taksh1507/secret-guard/commit/7604d045762890cacb48d714e89a2f155085d079))
+* **rules:** detect Bearer tokens and generic sk- prefixed secret keys ([9eb505c](https://github.com/taksh1507/secret-guard/commit/9eb505cb01fe06060957800181b14d9ae2746746))
+
+
+### Miscellaneous Chores
+
+* move community docs out of the repo root ([19afa58](https://github.com/taksh1507/secret-guard/commit/19afa58162b7ace7c380d8f9552651a665ee7b2d))
+
 ## [0.9.0](https://github.com/taksh1507/secret-guard/compare/v0.8.0...v0.9.0) (2026-09-02)
 
 
