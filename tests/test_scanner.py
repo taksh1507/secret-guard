@@ -5,6 +5,7 @@ import shutil
 import tempfile
 import unittest
 
+import secretguard.scanner as scanner_module
 from secretguard.rules import compile_custom_rules
 from secretguard.scanner import HAS_PATHSPEC, Scanner, line_number
 
@@ -214,6 +215,100 @@ class CustomRuleScannerTest(unittest.TestCase):
             skip_rules=["acme-token"], include_entropy=False
         )
         self.assertFalse(has_rule(scanner.scan(), "Acme Token"))
+
+
+class ParallelScanningTest(unittest.TestCase):
+    def setUp(self):
+        self._tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self._tmp, True)
+
+    def write(self, rel, content):
+        path = os.path.join(self._tmp, rel)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as handle:
+            handle.write(content)
+
+    def _populate(self, file_count):
+        for i in range(file_count):
+            content = f"line{i} = 1\n"
+            if i % 5 == 0:
+                content += f"TOKEN = '{TOKEN}'\n"
+            self.write(f"mod_{i:03d}.py", content)
+
+    def test_parallel_matches_sequential_output(self):
+        self._populate(40)
+        sequential = Scanner(self._tmp, workers=1).scan()
+        parallel = Scanner(self._tmp, workers=2).scan()
+        self.assertTrue(sequential)
+        self.assertEqual(sequential, parallel)
+
+    def test_auto_worker_count_matches_sequential_output(self):
+        self._populate(40)
+        sequential = Scanner(self._tmp, workers=1).scan()
+        auto = Scanner(self._tmp, workers=None).scan()
+        self.assertEqual(sequential, auto)
+
+    def test_output_is_sorted_regardless_of_mode(self):
+        self._populate(40)
+        findings = Scanner(self._tmp, workers=2).scan()
+        keys = [(f["path"], f["line"], f["rule_id"], f["value"]) for f in findings]
+        self.assertEqual(keys, sorted(keys))
+
+    def test_small_scan_never_uses_a_pool(self):
+        # Below the parallel threshold, even auto-detected workers should
+        # resolve to a plain sequential scan -- a pool isn't worth
+        # starting for a handful of files.
+        self.write("a.py", "x = 1")
+        scanner = Scanner(self._tmp, workers=None)
+        self.assertEqual(scanner._resolve_workers(1), 1)
+
+    def test_resolve_workers_caps_and_respects_explicit_value(self):
+        explicit = Scanner(self._tmp, workers=3)
+        self.assertEqual(explicit._resolve_workers(1000), 3)
+
+        auto = Scanner(self._tmp, workers=None)
+        resolved = auto._resolve_workers(1000)
+        self.assertGreaterEqual(resolved, 1)
+        self.assertLessEqual(resolved, scanner_module.MAX_AUTO_WORKERS)
+
+    def test_custom_rules_survive_the_parallel_path(self):
+        custom = compile_custom_rules([
+            {
+                "name": "Acme Token",
+                "pattern": "acme_tok_[a-f0-9]{20,}",
+                "severity": "critical",
+                "description": "Acme platform API token.",
+            }
+        ])
+        self._populate(40)
+        self.write("extra.py", f"api = '{CUSTOM_SECRET}'")
+        findings = Scanner(self._tmp, custom_rules=custom, workers=2).scan()
+        self.assertTrue(has_rule(findings, "Acme Token"))
+
+    def test_falls_back_to_sequential_when_the_pool_cannot_start(self):
+        self._populate(40)
+        sequential = Scanner(self._tmp, workers=1).scan()
+
+        class BrokenPool:
+            def __init__(self, *args, **kwargs):
+                raise OSError("simulated: process creation is restricted")
+
+        real_executor = scanner_module.concurrent.futures.ProcessPoolExecutor
+        scanner_module.concurrent.futures.ProcessPoolExecutor = BrokenPool
+        try:
+            findings = Scanner(self._tmp, workers=4).scan()
+        finally:
+            scanner_module.concurrent.futures.ProcessPoolExecutor = real_executor
+
+        self.assertEqual(findings, sequential)
+
+    def test_stress_many_files(self):
+        file_count = 300
+        self._populate(file_count)
+        findings = Scanner(self._tmp, workers=None).scan()
+        expected = len([i for i in range(file_count) if i % 5 == 0])
+        github_hits = [f for f in findings if f["rule_id"] == "github-token"]
+        self.assertEqual(len(github_hits), expected)
 
 
 if __name__ == "__main__":

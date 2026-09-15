@@ -30,6 +30,7 @@ secret-guard scan [path] [options]
 | `--reveal-prefix N` | Show first N characters of the masked secret |
 | `--reveal-suffix N` | Show last N characters of the masked secret |
 | `--staged` | Scan only files staged in git |
+| `--workers N` | Processes to scan with in parallel (default: auto-detected; `1` forces sequential) |
 | `--skip-rule RULE` | Never run the given rule id (repeatable) |
 | `--only-rule RULE` | Run only the given rule id (repeatable) |
 | `--list-rules` | List every available rule id and exit |
@@ -59,6 +60,20 @@ Installs a git pre-commit hook so every future commit runs a scan.
 Reads each staged file from the **git index** (`git show :<path>`) rather than
 the working tree. This catches secrets that were staged and then deleted before
 commit — exactly what would otherwise be committed.
+
+### `--workers`
+
+`secret-guard scan` (not `--staged` or `--stdin`, which already scan a small,
+fixed set of content) scans files across multiple processes once there are
+enough of them to make starting a pool worthwhile. Auto-detection picks a
+worker count from the CPU count, capped at 8; `--workers 1` always forces the
+plain sequential scan, and `--workers N` picks a specific count.
+
+Output is identical either way — the same findings, sorted the same way,
+regardless of which files finished first or how many workers ran. If a
+worker pool can't be started at all (a sandboxed environment that restricts
+process creation, for example), the scan falls back to sequential
+automatically rather than failing.
 
 ### `--json`
 
