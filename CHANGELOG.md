@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.11.0](https://github.com/taksh1507/secret-guard/compare/v0.10.0...v0.11.0) (2026-10-05)
+
+
+### Features
+
+* **action:** post scan findings as a PR comment ([#110](https://github.com/taksh1507/secret-guard/issues/110)) ([3437f99](https://github.com/taksh1507/secret-guard/commit/3437f996245d47c8abcc19304385b31ae72bd4c5))
+* **cli:** add baseline command to scaffold a baseline from findings ([#112](https://github.com/taksh1507/secret-guard/issues/112)) ([e2f14d9](https://github.com/taksh1507/secret-guard/commit/e2f14d96b5a32c3e0775c4b8684128224e7fc8a9))
+* **cli:** read config from pyproject.toml ([tool.secret-guard]) ([#103](https://github.com/taksh1507/secret-guard/issues/103)) ([b73d656](https://github.com/taksh1507/secret-guard/commit/b73d656f958eba449462a3b5237db93e598834af))
+* **report:** add SARIF 2.1.0 output for GitHub Code Scanning ([#104](https://github.com/taksh1507/secret-guard/issues/104)) ([08c4978](https://github.com/taksh1507/secret-guard/commit/08c49788fd5d829d9d8be5012fb7b65f03a8fd92))
+* **scanner:** skip hardcoded secrets that live only in comments ([#105](https://github.com/taksh1507/secret-guard/issues/105)) ([e1691c5](https://github.com/taksh1507/secret-guard/commit/e1691c5975169e335a52f0ddc9125377038be596))
+* **scanner:** support inline secret-guard:ignore allowlist pragmas ([#102](https://github.com/taksh1507/secret-guard/issues/102)) ([2e1c868](https://github.com/taksh1507/secret-guard/commit/2e1c8681d1638d32dc45ef7695b5acffd690646f))
+
+
+### Documentation
+
+* document GitLab CI and Azure Pipelines integration ([#101](https://github.com/taksh1507/secret-guard/issues/101)) ([4fafa59](https://github.com/taksh1507/secret-guard/commit/4fafa597a05d2a12c9b37f4bb50e800fa4a342e6))
+
 ## [0.10.0](https://github.com/taksh1507/secret-guard/compare/v0.9.0...v0.10.0) (2026-09-06)
 
 
