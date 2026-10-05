@@ -340,18 +340,6 @@ with `--baseline baseline.json` or through the `baseline` key of
 `secret-guard.json`. Scanned values are hashed client-side, so the baseline
 never needs to contain the secret itself.
 
-For a one-off, reviewable-in-the-same-diff exemption, add a
-`secret-guard:ignore` pragma to the end of the line instead:
-
-```python
-token = "ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"  # secret-guard:ignore
-```
-
-Scope it to specific rules with a comma-separated list of rule ids
-(`# secret-guard:ignore github-token`) to leave other findings on the same
-line intact. See [docs/cli.md](docs/cli.md#inline-allowlist-pragmas) for
-details.
-
 ### Severity and exit codes
 
 - `0` — no secrets found, or all findings are below the `--severity` threshold

@@ -603,6 +603,111 @@ class CliTest(unittest.TestCase):
             self.assertEqual(result.returncode, 1)
             self.assertIn("already exists", result.stderr)
 
+    def test_baseline_writes_file_accepted_by_scan_and_suppresses_it(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "leak.py").write_text(
+                f"TOKEN = '{SECRET}'\n", encoding="utf-8"
+            )
+            unbaselined = self.run_cli(tmp, "scan", "--no-entropy", ".")
+            self.assertEqual(unbaselined.returncode, 1)
+
+            baseline_path = Path(tmp, "baseline.json")
+            result = self.run_cli(
+                tmp, "baseline", "--output", str(baseline_path), "--no-entropy", "."
+            )
+            self.assertEqual(result.returncode, 0)
+            self.assertTrue(baseline_path.exists())
+            self.assertIn("Wrote", result.stdout)
+
+            data = json.loads(baseline_path.read_text(encoding="utf-8"))
+            self.assertIn("baseline", data)
+            self.assertTrue(data["baseline"])
+            entry = data["baseline"][0]
+            self.assertEqual(set(entry), {"path", "rule_id", "hash"})
+            self.assertEqual(entry["path"], "leak.py")
+
+            rescanned = self.run_cli(
+                tmp, "scan", "--no-entropy", "--baseline", str(baseline_path), "."
+            )
+            self.assertEqual(rescanned.returncode, 0)
+
+    def test_baseline_default_output_filename(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "leak.py").write_text(
+                f"TOKEN = '{SECRET}'\n", encoding="utf-8"
+            )
+            result = self.run_cli(tmp, "baseline", "--no-entropy", ".")
+            self.assertEqual(result.returncode, 0)
+            self.assertTrue(
+                Path(tmp, "secret-guard-baseline.json").exists()
+            )
+
+    def test_baseline_refuses_to_overwrite_without_force(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            baseline_path = Path(tmp, "baseline.json")
+            baseline_path.write_text("existing", encoding="utf-8")
+            result = self.run_cli(
+                tmp, "baseline", "--output", str(baseline_path), "."
+            )
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("already exists", result.stderr)
+            self.assertEqual(baseline_path.read_text(encoding="utf-8"), "existing")
+
+    def test_baseline_force_overwrites(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "leak.py").write_text(
+                f"TOKEN = '{SECRET}'\n", encoding="utf-8"
+            )
+            baseline_path = Path(tmp, "baseline.json")
+            baseline_path.write_text("existing", encoding="utf-8")
+            result = self.run_cli(
+                tmp, "baseline", "--output", str(baseline_path),
+                "--no-entropy", "--force", ".",
+            )
+            self.assertEqual(result.returncode, 0)
+            data = json.loads(baseline_path.read_text(encoding="utf-8"))
+            self.assertTrue(data["baseline"])
+
+    def test_baseline_does_not_suppress_a_newly_added_secret(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            leak = Path(tmp, "leak.py")
+            leak.write_text(f"TOKEN = '{SECRET}'\n", encoding="utf-8")
+            baseline_path = Path(tmp, "baseline.json")
+            self.run_cli(
+                tmp, "baseline", "--output", str(baseline_path), "--no-entropy", "."
+            )
+
+            other_secret = "ghp_zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"
+            with open(leak, "a", encoding="utf-8") as f:
+                f.write(f"OTHER = '{other_secret}'\n")
+
+            result = self.run_cli(
+                tmp, "scan", "--no-entropy", "--baseline", str(baseline_path), "."
+            )
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("leak.py:2", result.stdout)
+
+    def test_baseline_dedupes_repeated_identical_value(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "leak.py").write_text(
+                f"A = '{SECRET}'\nB = '{SECRET}'\n", encoding="utf-8"
+            )
+            baseline_path = Path(tmp, "baseline.json")
+            self.run_cli(
+                tmp, "baseline", "--output", str(baseline_path),
+                "--no-entropy", "--only-rule", "github-token", ".",
+            )
+            data = json.loads(baseline_path.read_text(encoding="utf-8"))
+            self.assertEqual(len(data["baseline"]), 1)
+
+    def test_baseline_unknown_rule_id_exits_2(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            result = self.run_cli(
+                tmp, "baseline", "--skip-rule", "not-a-real-rule", "."
+            )
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("unknown rule id", result.stderr)
+
     def test_scan_baseline_suppression(self):
         with tempfile.TemporaryDirectory() as tmp:
             # Create a file with a secret

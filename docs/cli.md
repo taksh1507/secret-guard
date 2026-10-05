@@ -46,6 +46,39 @@ secret-guard init
 Writes a documented starter `secret-guard.json` into the current directory.
 Fails with exit code `1` if one already exists.
 
+### `baseline`
+
+```
+secret-guard baseline [path] [options]
+```
+
+Scans like `scan` does, then writes the resulting findings out as a baseline
+file instead of a report — the same schema `--baseline`/`secret-guard.json`'s
+`baseline` key already accept, so a freshly generated baseline immediately
+suppresses every finding it was generated from. Useful for adopting
+secret-guard on an existing codebase without being blocked by every
+pre-existing finding on day one; new secrets added afterward are still caught
+normally.
+
+| Option | Description |
+| --- | --- |
+| `path` | Path to scan (default: `.`) |
+| `--output FILE` | Where to write the baseline (default: `secret-guard-baseline.json`) |
+| `--force` | Overwrite `--output` if it already exists |
+| `--exclude DIR` | Additional directory names to skip (repeatable) |
+| `--no-entropy` | Disable high-entropy string detection |
+| `--skip-rule RULE` | Never run the given rule id (repeatable) |
+| `--only-rule RULE` | Run only the given rule id (repeatable) |
+| `--rules-path FILE` | Add custom rules from a JSON manifest |
+
+Fails with exit code `1` if `--output` already exists (without `--force`), and
+exit code `2` for an unknown `--skip-rule`/`--only-rule` id, matching `scan`.
+
+```bash
+secret-guard baseline . --output secret-guard-baseline.json
+secret-guard scan . --baseline secret-guard-baseline.json  # exits 0 now
+```
+
 ### `install-hook`
 
 ```
