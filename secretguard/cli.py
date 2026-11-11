@@ -314,6 +314,12 @@ def build_parser():
         help="Scan only files staged in git.",
     )
     scan.add_argument(
+        "--workers", type=int, default=None, metavar="N",
+        help="Number of processes to scan with in parallel (default: "
+             "auto-detected from CPU count for large scans). --workers 1 "
+             "forces the plain sequential scan.",
+    )
+    scan.add_argument(
         "--baseline", metavar="FILE",
         help="Path to a baseline file containing allowed/suppressed secrets.",
     )
@@ -538,11 +544,11 @@ def _scan_staged(exclude, skip_rules, only_rules, custom_rules):
 
 def _scan_path(
     path, exclude, skip_rules, only_rules, no_entropy, custom_rules,
-    include_comments,
+    include_comments, workers=None,
 ):
     scanner = Scanner(
         path, excludes=exclude, skip_rules=skip_rules, only_rules=only_rules,
-        custom_rules=custom_rules,
+        custom_rules=custom_rules, workers=workers,
     )
     scanner.include_entropy = not no_entropy
     scanner.skip_comments = not include_comments
@@ -560,12 +566,13 @@ def _run_scan(
         )
     if args.staged:
         return _scan_staged(exclude, skip_rules, only_rules, custom_rules)
+    workers = getattr(args, "workers", None)
     multi = len(args.paths) > 1
     findings = []
     for path in args.paths:
         for finding in _scan_path(
             path, exclude, skip_rules, only_rules, no_entropy, custom_rules,
-            include_comments,
+            include_comments, workers,
         ):
             if multi:
                 finding["path"] = os.path.join(

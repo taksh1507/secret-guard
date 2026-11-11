@@ -53,6 +53,9 @@ value.
   `[tool.secret-guard]` in `pyproject.toml`) config, custom rule manifests,
   baselines, and severity thresholds.
 - **Fast, single-file deployment** — works in CI with a single `pip install`.
+- **Parallel scanning on large repos** — a scan with enough files automatically
+  spreads detection across multiple processes (`--workers` to control or
+  disable it), with output identical to a sequential scan either way.
 
 ## Installation
 
@@ -214,6 +217,8 @@ options:
   --no-color          Disable colored console output
   --quiet             Suppress all scan output; only the exit code is set
   --staged            Scan only files staged in git
+  --workers N         Processes to scan with in parallel (default:
+                      auto-detected from CPU count; 1 forces sequential)
   --baseline FILE     Suppress findings listed in a baseline file
   --severity LEVEL    Minimum severity to fail the scan (low, medium, high, critical)
   --max-findings N    Cap the number of findings printed to N; the scan still
